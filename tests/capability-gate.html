@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>capability-gate tests</title>
+<style>
+  body { background:#0b0d10; color:#e6eaef; font:14px/1.5 ui-monospace,Menlo,Consolas,monospace; padding:24px; }
+  h1 { font:600 16px ui-sans-serif,system-ui,sans-serif; margin:0 0 16px; }
+  ul { list-style:none; padding:0; display:grid; gap:6px; }
+  li::before { content:"[" attr(data-status) "] "; font-weight:700; }
+  li[data-status=pass]::before { color:#3fb950; }
+  li[data-status=fail]::before { color:#f85149; }
+  li[data-status=skip]::before { color:#d29922; }
+  .detail { color:#8b95a3; }
+</style>
+</head>
+<body>
+<h1>capability-gate tests</h1>
+<ul id="out"></ul>
+
+<script type="module">
+// Plain JS on purpose: Vite does not transpile TypeScript inside inline HTML
+// scripts. The module under test is TypeScript and Vite transpiles that.
+import { createCapabilityGate, CapabilityGateError, callTool } from '/src/lib/capability-gate.ts';
+
+const mc = document.modelContext;
+const results = [];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+window.__probeEnv = {
+  isSecureContext: window.isSecureContext,
+  originAgentCluster: window.originAgentCluster ?? '(unsupported)',
+  modelContext: mc ? 'present' : 'MISSING',
+};
+
+function record(status, title, detail = '') {
+  results.push({ status, title, detail });
+  const li = document.createElement('li');
+  li.dataset.status = status;
+  li.textContent = title;
+  if (detail) {
+    const span = document.createElement('span');
+    span.className = 'detail';
+    span.textContent = `  ${detail}`;
+    li.append(span);
+  }
+  document.getElementById('out').append(li);
+}
+
+async function test(title, fn) {
+  // Each test gets a fresh gate so state cannot leak between cases.
+  const gate = createCapabilityGate();
+  try {
+    record('pass', title, (await fn(gate)) ?? '');
+  } catch (error) {
+    record('fail', title, error?.message ?? String(error));
+  } finally {
+    gate.destroy();
+    await sleep(20);
+  }
+}
+
+const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+
+/* ---------- fixtures ---------- */
+
+// A claim-style capability: answers a comparison, never returns the source value.
+const SECRET_INCOME = 24_000;
+
+function defineIncomeClaim(gate, extra = {}) {
+  gate.define('check_income_threshold', {
+    description: 'Answer whether household income is below a stated threshold.',
+    inputSchema: {
+      type: 'object',
+      properties: { threshold: { type: 'number' } },
+      required: ['threshold'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+    validate: (raw) => {
+      const threshold = raw?.threshold;
+      if (typeof threshold !== 'number' || !Number.isFinite(threshold)) {
+        throw new Error('threshold must be a finite number');
+      }
+      return { threshold };
+    },
+    execute: ({ threshold }) => ({ belowThreshold: SECRET_INCOME < threshold }),
+    summarize: ({ threshold }) => `compared income against ${threshold}`,
+    ...extra,
+  });
+  return gate;
+}
+
+async function main() {
+  if (!mc) {
+    record('skip', 'WebMCP unavailable', 'enable chrome://flags/#enable-webmcp-testing');
+    return;
+  }
+
+  await test('define does not register: the tool is absent before any grant', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    assert(!(await gate.liveToolNames()).includes('check_income_threshold'), 'tool existed without a grant');
+    assert(gate.isGranted('check_income_threshold') === false, 'gate reported it granted');
+  });
+
+  await test('grant registers the tool', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold', { reason: 'Housing Support' });
+    assert((await gate.liveToolNames()).includes('check_income_threshold'), 'tool absent after grant');
+  });
+
+  await test('a granted tool returns an ok envelope and never the raw value', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold');
+    const out = await callTool(mc, 'check_income_threshold', { threshold: 30_000 });
+    assert(out.ok === true, `expected ok, got ${JSON.stringify(out)}`);
+    assert(out.result.belowThreshold === true, 'wrong comparison result');
+    assert(!JSON.stringify(out).includes(String(SECRET_INCOME)), 'response leaked the source income');
+    return '(comparison only)';
+  });
+
+  await test('revoke removes the tool and blocks a stale handle', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold');
+    const stale = (await mc.getTools()).find((t) => t.name === 'check_income_threshold');
+    gate.revoke('check_income_threshold');
+    await sleep(50);
+    assert(!(await gate.liveToolNames()).includes('check_income_threshold'), 'tool survived revoke');
+    let rejected = false;
+    try { await mc.executeTool(stale, '{"threshold":30000}'); } catch { rejected = true; }
+    assert(rejected, 'stale handle still executed');
+    return '(stale handle rejected)';
+  });
+
+  await test('a time-boxed grant expires on its own', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold', { ttlMs: 150 });
+    assert((await gate.liveToolNames()).includes('check_income_threshold'), 'never registered');
+    await sleep(320);
+    assert(!(await gate.liveToolNames()).includes('check_income_threshold'), 'outlived its grant');
+    const revoked = gate.audit().filter((e) => e.type === 'revoked' && e.cause === 'expiry');
+    assert(revoked.length === 1, 'expiry not recorded in the audit log');
+    return '(150ms grant, expiry audited)';
+  });
+
+  await test('bad input is returned as invalid_input, not thrown', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold');
+    // Chrome does not enforce inputSchema, so a required property can be absent.
+    const out = await callTool(mc, 'check_income_threshold', {});
+    assert(out.ok === false, 'malformed call was accepted');
+    assert(out.error.code === 'invalid_input', `wrong code ${out.error.code}`);
+    return '(agent gets an actionable message)';
+  });
+
+  await test('a throwing execute is returned as failed', async (gate) => {
+    gate.define('boom', {
+      description: 'Always throws.',
+      annotations: { readOnlyHint: true },
+      validate: () => ({}),
+      execute: () => { throw new Error('kaboom'); },
+    });
+    await gate.start();
+    await gate.grant('boom');
+    const out = await callTool(mc, 'boom', {});
+    assert(out.ok === false && out.error.code === 'failed', `unexpected ${JSON.stringify(out)}`);
+    assert(out.error.message === 'kaboom', 'message not surfaced');
+  });
+
+  await test('persistent capabilities register at start and refuse grant', async (gate) => {
+    gate.define('list_programs', {
+      description: 'List available programs.',
+      persistent: true,
+      annotations: { readOnlyHint: true },
+      validate: () => ({}),
+      execute: () => ({ programs: ['housing', 'energy'] }),
+    });
+    await gate.start();
+    assert((await gate.liveToolNames()).includes('list_programs'), 'persistent tool not registered at start');
+    let threw = false;
+    try { await gate.grant('list_programs'); } catch (e) { threw = e instanceof CapabilityGateError; }
+    assert(threw, 'granting a persistent capability was allowed');
+    const out = await callTool(mc, 'list_programs', {});
+    assert(out.ok === true, 'persistent tool did not execute');
+  });
+
+  await test('double grant is safe and does not duplicate registration', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold', { ttlMs: 5000 });
+    await gate.grant('check_income_threshold', { ttlMs: 9000, reason: 'extended' });
+    const names = await gate.liveToolNames();
+    const count = names.filter((n) => n === 'check_income_threshold').length;
+    assert(count === 1, `expected 1 registration, saw ${count}`);
+    const state = gate.snapshot().capabilities.find((c) => c.name === 'check_income_threshold');
+    assert(state.reason === 'extended', 'reason not updated on re-grant');
+    return '(window extended, not re-registered)';
+  });
+
+  await test('audit log records grant, call and revoke in order', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold', { reason: 'Housing Support' });
+    await callTool(mc, 'check_income_threshold', { threshold: 30_000 });
+    gate.revoke('check_income_threshold');
+    const types = gate.audit().map((e) => e.type);
+    assert(types.join(',') === 'granted,called,revoked', `got ${types.join(',')}`);
+  });
+
+  await test('the audit summary does not contain the source value', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold');
+    await callTool(mc, 'check_income_threshold', { threshold: 30_000 });
+    const called = gate.audit().find((e) => e.type === 'called');
+    assert(called.summary === 'compared income against 30000', `unexpected summary "${called.summary}"`);
+    assert(!JSON.stringify(gate.audit()).includes(String(SECRET_INCOME)), 'audit log leaked the source income');
+    return '(receipt is disclosure-safe)';
+  });
+
+  await test('subscribe fires on grant and on revoke', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    let calls = 0;
+    const unsubscribe = gate.subscribe(() => { calls += 1; });
+    assert(calls === 1, 'subscribe did not emit current state immediately');
+    await gate.grant('check_income_threshold');
+    gate.revoke('check_income_threshold');
+    unsubscribe();
+    await gate.grant('check_income_threshold');
+    assert(calls === 3, `expected 3 emissions before unsubscribe, saw ${calls}`);
+    return '(and stops after unsubscribe)';
+  });
+
+  await test('requestConsent records a pending request that granting clears', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    gate.requestConsent('check_income_threshold', 'to check Housing Support');
+    assert(gate.snapshot().pending.length === 1, 'request not recorded');
+    assert(gate.audit().some((e) => e.type === 'requested'), 'request not audited');
+    await gate.grant('check_income_threshold');
+    assert(gate.snapshot().pending.length === 0, 'pending request survived the grant');
+  });
+
+  await test('requestConsent refuses when already granted', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    await gate.grant('check_income_threshold');
+    let threw = false;
+    try { gate.requestConsent('check_income_threshold', 'redundant'); } catch (e) { threw = e instanceof CapabilityGateError; }
+    assert(threw, 'redundant request was accepted');
+  });
+
+  await test('unknown capability names are rejected', async (gate) => {
+    await gate.start();
+    let threw = false;
+    try { await gate.grant('nope'); } catch (e) { threw = e instanceof CapabilityGateError; }
+    assert(threw, 'granting an undefined capability was allowed');
+  });
+
+  await test('invalid tool names are rejected at define time', async (gate) => {
+    let threw = false;
+    try {
+      gate.define('has spaces', { description: 'x', validate: () => ({}), execute: () => ({}) });
+    } catch (e) { threw = e instanceof CapabilityGateError; }
+    assert(threw, 'invalid tool name was accepted');
+  });
+
+  await test('destroy revokes everything including persistent tools', async (gate) => {
+    defineIncomeClaim(gate);
+    gate.define('list_programs', {
+      description: 'List available programs.',
+      persistent: true,
+      annotations: { readOnlyHint: true },
+      validate: () => ({}),
+      execute: () => ({ programs: [] }),
+    });
+    await gate.start();
+    await gate.grant('check_income_threshold');
+    gate.destroy();
+    await sleep(50);
+    const names = await gate.liveToolNames();
+    assert(names.length === 0, `expected an empty registry, saw ${names.join(', ')}`);
+  });
+}
+
+try {
+  await main();
+} catch (error) {
+  record('fail', 'suite', error?.message ?? String(error));
+} finally {
+  window.__probeResults = results;
+  window.__probeDone = true;
+}
+</script>
+</body>
+</html>

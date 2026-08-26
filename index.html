@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proof, Not Profile</title>
+<meta name="description" content="A WebMCP eligibility wallet where the agent's tool registry is gated on revocable user consent.">
+<link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <p class="eyebrow">Proof, Not Profile</p>
+  <h1>The agent gets answers, not your data.</h1>
+  <p class="lede">
+    Eligibility forms ask for an exact salary when the decision only needs to know
+    whether income is below a threshold. This wallet answers the question without
+    ever exposing the number, and the tools an agent can call exist only while you
+    permit them.
+  </p>
+</header>
+
+<main id="main">
+  <section class="panel" aria-labelledby="deploy-check">
+    <h2 id="deploy-check">Deployment check</h2>
+    <p class="note">
+      WebMCP requires an origin-isolated document. If
+      <code>originAgentCluster</code> is false here, the
+      <code>Origin-Agent-Cluster</code> header is not reaching the browser and no
+      tool can be registered at all.
+    </p>
+    <dl class="env" id="env"></dl>
+  </section>
+
+  <section class="panel" aria-labelledby="console-heading">
+    <h2 id="console-heading">Agent capabilities</h2>
+    <p class="note">
+      Read live from <code>getTools()</code>, so this is what the browser exposes
+      rather than what this page believes it registered.
+    </p>
+    <div id="console" class="capabilities" aria-live="polite"></div>
+    <div class="controls" id="controls"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="audit-heading">
+    <h2 id="audit-heading">Disclosure log</h2>
+    <p class="note">Append-only. Records which claim was compared, never the source value.</p>
+    <ol class="audit" id="audit"></ol>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>
+    Day 2 stub. Built for the WebMCP Challenge. Synthetic demo data only, held in
+    this browser.
+  </p>
+</footer>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

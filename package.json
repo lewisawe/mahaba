@@ -1,0 +1,20 @@
+{
+  "name": "proof-not-profile",
+  "version": "0.1.0",
+  "description": "A WebMCP eligibility wallet where the agent's tool registry is gated on revocable user consent.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node probe/run.mjs --url http://localhost:5173/tests/capability-gate.html",
+    "probe": "node probe/run.mjs index.html"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}

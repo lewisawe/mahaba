@@ -1,0 +1,22 @@
+node_modules/
+dist/
+dist-ssr/
+
+# Internal working documents. Strategy, planning and progress notes stay local.
+IDEA.md
+PLAN.md
+progress.md
+
+.netlify/
+.env
+.env.*
+!.env.example
+
+*.local
+*.log
+npm-debug.log*
+
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/

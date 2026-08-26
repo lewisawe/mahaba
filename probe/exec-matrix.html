@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>WebMCP exec matrix</title></head>
+<body>
+<h1>executeTool schema/argument matrix</h1>
+<pre id="out"></pre>
+<script type="module">
+// Finds which inputSchema shapes and argument shapes Chrome's WebMCP
+// implementation actually accepts, since the spec text is looser than the
+// implementation. Results are reported through the harness contract:
+// window.__probeResults + window.__probeDone.
+
+const mc = document.modelContext;
+const results = [];
+
+window.__probeEnv = {
+  isSecureContext: window.isSecureContext,
+  originAgentCluster: window.originAgentCluster ?? '(unsupported)',
+  modelContext: mc ? 'present' : 'MISSING',
+};
+
+function record(status, title, detail) {
+  results.push({ status, title, detail });
+  document.getElementById('out').textContent +=
+    `[${status.toUpperCase()}] ${title} :: ${detail}\n`;
+}
+
+async function trial(label, toolPatch, args, sendArgs = true) {
+  const ac = new AbortController();
+  const name = `t_${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    await mc.registerTool({
+      name,
+      description: 'matrix trial',
+      execute: async (input) => ({ received: input ?? null }),
+      ...toolPatch,
+    }, { signal: ac.signal });
+  } catch (e) {
+    record('fail', label, `register rejected: ${e?.name ?? ''} ${e?.message ?? e}`);
+    return;
+  }
+  try {
+    const tool = (await mc.getTools()).find((t) => t.name === name);
+    const raw = sendArgs ? await mc.executeTool(tool, args) : await mc.executeTool(tool);
+    record('pass', label, `returned ${raw}`);
+  } catch (e) {
+    record('fail', label, `execute rejected: ${e?.name ?? ''} ${e?.message ?? e}`);
+  } finally {
+    ac.abort();
+  }
+}
+
+async function main() {
+  if (!mc) {
+    record('skip', 'WebMCP unavailable', 'document.modelContext missing');
+    return;
+  }
+
+  await trial('A no inputSchema, args {}', {}, {});
+  await trial('B no inputSchema, args omitted', {}, undefined, false);
+
+  // Hypothesis: this build's IDL takes a JSON *string*, not an object. Passing
+  // an object would stringify to "[object Object]", which is not valid JSON and
+  // would explain "Failed to parse input arguments" for every object shape.
+  await trial('A2 no inputSchema, args "{}" as JSON string', {}, '{}');
+  await trial('C2 properties:{}, args "{}" as JSON string',
+    { inputSchema: { type: 'object', properties: {} } }, '{}');
+  await trial('G2 optional string prop, args \'{"q":"x"}\' as JSON string',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } } } }, '{"q":"x"}');
+  await trial('H2 required string prop, args \'{"q":"x"}\' as JSON string',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } }, '{"q":"x"}');
+  await trial('I2 required string prop, args "{}" as JSON string (expect validation rejection)',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } }, '{}');
+
+  await trial('C properties:{} + additionalProperties:false, args {}',
+    { inputSchema: { type: 'object', properties: {}, additionalProperties: false } }, {});
+  await trial('D properties:{}, args {}',
+    { inputSchema: { type: 'object', properties: {} } }, {});
+  await trial('E bare type:object, args {}',
+    { inputSchema: { type: 'object' } }, {});
+  await trial('F optional string prop, args {}',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } } } }, {});
+  await trial('G optional string prop, args {q:"x"}',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } } } }, { q: 'x' });
+  await trial('H required string prop, args {q:"x"}',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } }, { q: 'x' });
+  await trial('I required string prop, args {} (expect rejection)',
+    { inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } }, {});
+  await trial('J with $schema + description keys, args {q:"x"}',
+    { inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { q: { type: 'string', description: 'a query' } },
+        required: ['q'],
+        additionalProperties: false,
+      } }, { q: 'x' });
+}
+
+try {
+  await main();
+} catch (error) {
+  record('fail', 'harness', error?.message ?? String(error));
+} finally {
+  window.__probeResults = results;
+  window.__probeDone = true;
+}
+</script>
+</body>
+</html>

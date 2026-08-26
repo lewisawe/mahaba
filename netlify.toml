@@ -1,0 +1,24 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# WebMCP is only available in origin-isolated documents. Without this header the
+# agent cluster is site-keyed, registerTool() rejects with SecurityError, and the
+# entire API silently disappears. See probe/FINDINGS.md.
+#
+# localhost is origin-keyed regardless, so this cannot be validated locally.
+# Verify on the deployed URL by reading window.originAgentCluster.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Origin-Agent-Cluster = "?1"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    # This app holds sensitive demo data in localStorage and must not be
+    # embedded by another origin.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

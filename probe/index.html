@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebMCP capability probe</title>
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #14181d; --line: #242a32;
+    --text: #e6eaef; --dim: #8b95a3;
+    --ok: #3fb950; --fail: #f85149; --warn: #d29922; --live: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.55 ui-sans-serif, system-ui, sans-serif; padding: 32px 24px 64px; }
+  main { max-width: 940px; margin: 0 auto; display: grid; gap: 24px; }
+  h1 { font-size: 20px; font-weight: 600; }
+  h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); }
+  p.lede { color: var(--dim); max-width: 64ch; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: grid; gap: 14px; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+
+  dl.env { display: grid; gap: 6px; }
+  dl.env > div { display: flex; gap: 12px; align-items: baseline; }
+  dl.env dt { color: var(--dim); min-width: 21ch; }
+  dl.env dd { margin: 0; word-break: break-all; }
+
+  ul { list-style: none; padding: 0; display: grid; gap: 7px; }
+  li.result { display: grid; grid-template-columns: 2ch 1fr; gap: 10px; align-items: baseline; }
+  .badge { font-weight: 700; }
+  .pass .badge { color: var(--ok); }
+  .fail .badge { color: var(--fail); }
+  .skip .badge { color: var(--warn); }
+  .detail { color: var(--dim); font-size: 13px; }
+
+  #registry { display: grid; gap: 8px; min-height: 24px; }
+  #registry:empty::after { content: "agent has no capabilities"; color: var(--dim); font-style: italic; }
+  .tool { border: 1px solid var(--line); border-left: 2px solid var(--live); border-radius: 6px; padding: 9px 12px; display: grid; gap: 3px; animation: mount .22s ease-out; }
+  @keyframes mount { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .tool .name { font-weight: 600; }
+  .tool .meta { color: var(--dim); font-size: 12px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { background: #1f262e; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px 13px; font: inherit; font-size: 14px; cursor: pointer; min-height: 40px; }
+  button:hover:not(:disabled) { background: #29323c; }
+  button:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  #log { max-height: 200px; overflow-y: auto; display: grid; gap: 4px; }
+  #log div { color: var(--dim); font-size: 12.5px; }
+  #log time { color: #5c6672; margin-right: 8px; }
+  .summary { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>WebMCP capability probe</h1>
+    <p class="lede">
+      Verifies the platform behaviour <code>capability-gate</code> depends on: a tool can be
+      registered, revoked through <code>AbortSignal</code>, and execution actually fails once revoked.
+    </p>
+  </header>
+
+  <section>
+    <h2>Environment</h2>
+    <dl class="env mono" id="env"></dl>
+  </section>
+
+  <section>
+    <h2>Assertions</h2>
+    <ul id="results"></ul>
+    <p class="summary" id="summary"></p>
+  </section>
+
+  <section>
+    <h2>Live registry <span class="detail">read from getTools(), not local bookkeeping</span></h2>
+    <div id="registry"></div>
+    <div class="controls">
+      <button id="grant">Grant capability</button>
+      <button id="grantTimed">Grant for 5s</button>
+      <button id="revoke">Revoke</button>
+      <button id="call">Call it</button>
+    </div>
+    <p class="detail" id="callResult"></p>
+  </section>
+
+  <section>
+    <h2>toolchange events</h2>
+    <div id="log" class="mono"></div>
+  </section>
+</main>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const mc = document.modelContext;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ------------------------------------------------------------------ *
+ * Implementation notes discovered empirically against Chrome 152.
+ *
+ * 1. WebMCP requires an origin-keyed agent cluster. Send the
+ *    `Origin-Agent-Cluster: ?1` response header or registerTool()
+ *    rejects with SecurityError.
+ * 2. executeTool()'s second argument is a JSON *string*, not an object,
+ *    and it is required. Passing an object yields
+ *    "Failed to parse input arguments" because it stringifies to
+ *    "[object Object]".
+ * 3. Chrome does not validate arguments against inputSchema. The schema
+ *    is advisory, so every tool must validate its own input.
+ * 4. registerTool() is revoked by aborting the AbortSignal passed in
+ *    options. There is no unregister() method.
+ * ------------------------------------------------------------------ */
+
+const callTool = async (tool, args = {}) =>
+  JSON.parse(await mc.executeTool(tool, JSON.stringify(args)));
+
+/* ---------- environment ---------- */
+
+const env = {
+  isSecureContext: window.isSecureContext,
+  originAgentCluster: window.originAgentCluster ?? '(unsupported)',
+  'document.modelContext': mc ? 'present' : 'MISSING',
+  userAgent: navigator.userAgent,
+};
+window.__probeEnv = env;
+
+for (const [label, value] of Object.entries(env)) {
+  const row = document.createElement('div');
+  const dt = document.createElement('dt');
+  const dd = document.createElement('dd');
+  dt.textContent = label;
+  dd.textContent = String(value);
+  if (value === true || value === 'present') dd.style.color = 'var(--ok)';
+  if (value === false || value === 'MISSING') dd.style.color = 'var(--fail)';
+  row.append(dt, dd);
+  $('env').append(row);
+}
+
+/* ---------- logging ---------- */
+
+function log(message) {
+  const row = document.createElement('div');
+  const t = document.createElement('time');
+  t.textContent = new Date().toLocaleTimeString([], { hour12: false });
+  row.append(t, document.createTextNode(message));
+  $('log').prepend(row);
+}
+
+/* ---------- registry rendering ---------- */
+
+// Render from getTools() so the panel shows the browser's ground truth rather
+// than what our own code believes it registered.
+async function renderRegistry() {
+  if (!mc) return;
+  const tools = await mc.getTools();
+  const host = $('registry');
+  host.textContent = '';
+  for (const tool of tools) {
+    const el = document.createElement('div');
+    el.className = 'tool';
+    const name = document.createElement('div');
+    name.className = 'name mono';
+    name.textContent = tool.name;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = `${tool.annotations?.readOnlyHint ? 'read' : 'write'} · ${tool.description}`;
+    el.append(name, meta);
+    host.append(el);
+  }
+}
+
+if (mc) {
+  mc.addEventListener('toolchange', () => {
+    log('toolchange');
+    renderRegistry();
+  });
+}
+
+/* ---------- tool helpers ---------- */
+
+function defineTool(name, execute) {
+  return {
+    name,
+    title: name,
+    description: `Probe tool ${name}`,
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    execute,
+  };
+}
+
+const toolNames = async () => (await mc.getTools()).map((t) => t.name);
+
+async function findTool(name) {
+  const tool = (await mc.getTools()).find((t) => t.name === name);
+  if (!tool) throw new Error(`no tool named ${name}`);
+  return tool;
+}
+
+/* ---------- assertions ---------- */
+
+const results = [];
+
+function record(status, title, detail = '') {
+  results.push({ status, title, detail });
+  const li = document.createElement('li');
+  li.className = `result ${status}`;
+  const badge = document.createElement('span');
+  badge.className = 'badge';
+  badge.textContent = status === 'pass' ? '\u2713' : status === 'fail' ? '\u2717' : '\u2013';
+  const body = document.createElement('span');
+  body.textContent = title;
+  if (detail) {
+    const d = document.createElement('span');
+    d.className = 'detail';
+    d.textContent = ` ${detail}`;
+    body.append(d);
+  }
+  li.append(badge, body);
+  $('results').append(li);
+}
+
+async function check(title, fn) {
+  try {
+    record('pass', title, (await fn()) ?? '');
+  } catch (error) {
+    record('fail', title, error?.message ?? String(error));
+  }
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function runAssertions() {
+  if (!mc) {
+    record('skip', 'WebMCP unavailable', 'enable chrome://flags/#enable-webmcp-testing');
+    return;
+  }
+
+  // 1. Registration puts the tool in the registry.
+  const acA = new AbortController();
+  await check('registerTool resolves and the tool appears in getTools()', async () => {
+    await mc.registerTool(defineTool('probe_alpha', async () => ({ value: 'alpha' })), { signal: acA.signal });
+    assert((await toolNames()).includes('probe_alpha'), 'probe_alpha absent after registration');
+  });
+
+  // 2. A granted tool executes.
+  await check('a granted tool executes', async () => {
+    const out = await callTool(await findTool('probe_alpha'));
+    assert(out.value === 'alpha', `unexpected result ${JSON.stringify(out)}`);
+  });
+
+  // 3. Aborting the signal revokes it. Capture a handle first so assertion 4
+  //    can attempt a call with a stale reference.
+  const staleHandle = await findTool('probe_alpha');
+  await check('aborting the registration signal removes the tool', async () => {
+    acA.abort();
+    await sleep(60);
+    assert(!(await toolNames()).includes('probe_alpha'), 'probe_alpha still registered after abort');
+  });
+
+  // 4. The property the whole project rests on: a revoked capability cannot be
+  //    executed, even by a caller that already holds a tool reference.
+  await check('a revoked tool CANNOT be executed, even via a stale handle', async () => {
+    let rejected = false;
+    try {
+      await mc.executeTool(staleHandle, '{}');
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, 'revoked tool still executed');
+    return '(stale reference conferred no access)';
+  });
+
+  // 5. Name reuse, so a capability can be re-granted after revocation.
+  await check('a revoked name can be re-registered', async () => {
+    const ac = new AbortController();
+    await mc.registerTool(defineTool('probe_alpha', async () => ({ value: 'again' })), { signal: ac.signal });
+    const out = await callTool(await findTool('probe_alpha'));
+    assert(out.value === 'again', 're-registration returned the stale implementation');
+    ac.abort();
+    await sleep(40);
+  });
+
+  // 6. Duplicate names are rejected, so the gate must guard against double-grant.
+  await check('duplicate registration is rejected', async () => {
+    const ac1 = new AbortController();
+    const ac2 = new AbortController();
+    await mc.registerTool(defineTool('probe_dupe', async () => ({})), { signal: ac1.signal });
+    let rejected = false;
+    try {
+      await mc.registerTool(defineTool('probe_dupe', async () => ({})), { signal: ac2.signal });
+    } catch {
+      rejected = true;
+    }
+    ac1.abort();
+    await sleep(40);
+    assert(rejected, 'duplicate registration was allowed');
+    return '(gate must guard double-grant)';
+  });
+
+  // 7. Expiry needs nothing more than a timer that aborts the controller.
+  await check('a time-boxed grant unregisters itself on expiry', async () => {
+    const ac = new AbortController();
+    await mc.registerTool(defineTool('probe_expiring', async () => ({})), { signal: ac.signal });
+    assert((await toolNames()).includes('probe_expiring'), 'expiring tool never registered');
+    setTimeout(() => ac.abort(), 150);
+    await sleep(320);
+    assert(!(await toolNames()).includes('probe_expiring'), 'expiring tool outlived its grant');
+    return '(150ms grant)';
+  });
+
+  // 8. toolchange must fire, because the console renders off it.
+  await check('toolchange fires on both register and revoke', async () => {
+    let count = 0;
+    const onChange = () => { count += 1; };
+    mc.addEventListener('toolchange', onChange);
+    const ac = new AbortController();
+    await mc.registerTool(defineTool('probe_events', async () => ({})), { signal: ac.signal });
+    await sleep(80);
+    ac.abort();
+    await sleep(80);
+    mc.removeEventListener('toolchange', onChange);
+    assert(count >= 2, `expected >= 2 toolchange events, saw ${count}`);
+    return `(${count} events)`;
+  });
+
+  // 9. Chrome does not enforce inputSchema, so tools must validate themselves.
+  await check('inputSchema is NOT enforced by the browser', async () => {
+    const ac = new AbortController();
+    await mc.registerTool({
+      name: 'probe_validation',
+      description: 'requires q but does not get it',
+      inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] },
+      annotations: { readOnlyHint: true },
+      execute: async (input) => ({ sawQ: Object.hasOwn(input ?? {}, 'q') }),
+    }, { signal: ac.signal });
+    const out = await callTool(await findTool('probe_validation'));
+    ac.abort();
+    await sleep(40);
+    assert(out.sawQ === false, 'expected the required property to be absent');
+    return '(tools must validate their own input)';
+  });
+
+  const failed = results.filter((r) => r.status === 'fail').length;
+  $('summary').textContent = failed === 0
+    ? `All ${results.length} assertions passed. Revocable capabilities are viable.`
+    : `${failed} of ${results.length} assertions failed.`;
+  $('summary').style.color = failed === 0 ? 'var(--ok)' : 'var(--fail)';
+}
+
+/* ---------- manual controls ---------- */
+
+let manual = null;
+let manualTimer = null;
+
+function syncControls() {
+  $('grant').disabled = !mc || manual !== null;
+  $('grantTimed').disabled = !mc || manual !== null;
+  $('revoke').disabled = !mc || manual === null;
+  $('call').disabled = !mc;
+}
+
+function clearManual() {
+  if (manualTimer) clearTimeout(manualTimer);
+  manualTimer = null;
+  manual = null;
+  syncControls();
+}
+
+async function grantManual(ttlMs) {
+  manual = new AbortController();
+  // Aborting mid-registration rejects this promise, so it is guarded.
+  await mc.registerTool(
+    defineTool('probe_manual', async () => ({ grantedAt: new Date().toISOString() })),
+    { signal: manual.signal },
+  ).catch(() => {});
+  log(ttlMs ? `granted probe_manual for ${ttlMs}ms` : 'granted probe_manual');
+  if (ttlMs) {
+    manualTimer = setTimeout(() => {
+      manual?.abort();
+      log('probe_manual expired');
+      clearManual();
+    }, ttlMs);
+  }
+  syncControls();
+}
+
+$('grant').addEventListener('click', () => grantManual(null));
+$('grantTimed').addEventListener('click', () => grantManual(5000));
+$('revoke').addEventListener('click', () => {
+  manual?.abort();
+  log('revoked probe_manual');
+  clearManual();
+});
+$('call').addEventListener('click', async () => {
+  try {
+    const out = await callTool(await findTool('probe_manual'));
+    $('callResult').textContent = `called: ${JSON.stringify(out)}`;
+    $('callResult').style.color = 'var(--ok)';
+  } catch (error) {
+    $('callResult').textContent = `blocked: ${error?.message ?? error}`;
+    $('callResult').style.color = 'var(--fail)';
+  }
+});
+
+syncControls();
+
+try {
+  await runAssertions();
+} catch (error) {
+  record('fail', 'assertion harness', error?.message ?? String(error));
+} finally {
+  await renderRegistry();
+  window.__probeResults = results;
+  window.__probeDone = true;
+}
+</script>
+</body>
+</html>
