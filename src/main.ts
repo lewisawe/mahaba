@@ -1,295 +1,102 @@
 /**
- * Day 2 stub.
+ * Application wiring.
  *
- * Purpose is to prove the deployment pipeline: that WebMCP is available on the
- * deployed origin, that capability-gate registers and revokes real tools there,
- * and that the console can render from browser ground truth.
- *
- * The real program set, negotiation loop and signed receipts come later. What is
- * here is the load-bearing part.
+ * State is deliberately small: one gate, one profile. Every view is a pure
+ * function of a snapshot, re-rendered on change, because the thing being
+ * displayed is a security boundary and stale UI would be a lie about it.
  */
 
-import { createCapabilityGate, type AuditEntry, type GateSnapshot } from './lib/capability-gate';
-import './styles.css';
+import { createCapabilityGate } from './lib/capability-gate';
+import { registerCapabilities } from './capabilities';
+import {
+  clearProfile,
+  DEFAULT_PROFILE,
+  loadProfile,
+  saveProfile,
+  type Profile,
+} from './domain/profile';
+import { mount } from './ui/dom';
+import {
+  GRANT_TTL_MS,
+  renderClaimControls,
+  renderConsole,
+  renderPending,
+  type ConsentActions,
+} from './ui/consent';
+import { renderAudit, renderEnvironment, renderPrograms, renderProfile } from './ui/views';
 
 /* ------------------------------------------------------------------ *
- * Synthetic demo profile. Stays in this browser. Never returned by a tool.
- * ------------------------------------------------------------------ */
-
-const PROFILE = {
-  annualIncome: 24_000,
-  age: 34,
-  householdSize: 4,
-  district: 'north',
-} as const;
-
-/* ------------------------------------------------------------------ *
- * Environment panel
- * ------------------------------------------------------------------ */
-
-function renderEnvironment(): void {
-  const host = document.getElementById('env');
-  if (!host) return;
-
-  const mc = document.modelContext;
-  const rows: Array<[string, string, 'good' | 'bad' | 'plain']> = [
-    ['isSecureContext', String(window.isSecureContext), window.isSecureContext ? 'good' : 'bad'],
-    [
-      'originAgentCluster',
-      String(window.originAgentCluster ?? '(unsupported)'),
-      window.originAgentCluster === true ? 'good' : 'bad',
-    ],
-    ['document.modelContext', mc ? 'present' : 'missing', mc ? 'good' : 'bad'],
-    ['origin', window.location.origin, 'plain'],
-  ];
-
-  for (const [label, value, state] of rows) {
-    const wrap = document.createElement('div');
-    const dt = document.createElement('dt');
-    const dd = document.createElement('dd');
-    dt.textContent = label;
-    dd.textContent = value;
-    if (state !== 'plain') dd.dataset.state = state;
-    wrap.append(dt, dd);
-    host.append(wrap);
-  }
-
-  if (!mc) {
-    const wrap = document.createElement('div');
-    const dd = document.createElement('dd');
-    dd.dataset.state = 'bad';
-    dd.textContent = 'WebMCP unavailable. In Chrome, enable chrome://flags/#enable-webmcp-testing.';
-    wrap.append(document.createElement('dt'), dd);
-    host.append(wrap);
-  }
-}
-
-/* ------------------------------------------------------------------ *
- * Capabilities
+ * State
  * ------------------------------------------------------------------ */
 
 const gate = createCapabilityGate();
+let profile: Profile = loadProfile();
 
-/** Reject anything that is not a plain object, before touching its fields. */
-function asRecord(raw: unknown): Record<string, unknown> {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    throw new Error('expected an object of arguments');
-  }
-  return raw as Record<string, unknown>;
+const getProfile = (): Profile => profile;
+
+/* ------------------------------------------------------------------ *
+ * Rendering
+ * ------------------------------------------------------------------ */
+
+const hosts = {
+  console: mount('console'),
+  pending: mount('pending'),
+  pendingPanel: mount('pending-panel'),
+  claims: mount('claims'),
+  programs: mount('programs'),
+  audit: mount('audit'),
+  profile: mount('profile'),
+  env: mount('env'),
+};
+
+const consentActions: ConsentActions = {
+  grant: async (tool, reason) => {
+    try {
+      await gate.grant(tool, { ttlMs: GRANT_TTL_MS, reason });
+    } catch (error) {
+      // A failed grant must not leave the UI implying the capability exists.
+      console.error(`could not grant ${tool}`, error);
+      render();
+    }
+  },
+  revoke: (tool) => gate.revoke(tool),
+  deny: (tool) => gate.denyConsent(tool),
+};
+
+function render(): void {
+  const snapshot = gate.snapshot();
+
+  renderConsole(hosts.console, snapshot);
+  renderPending(hosts.pending, snapshot, consentActions);
+  if (hosts.pendingPanel) hosts.pendingPanel.hidden = snapshot.pending.length === 0;
+  renderClaimControls(hosts.claims, snapshot, consentActions);
+  renderPrograms(hosts.programs, profile, (tool) => gate.isGranted(tool));
+  renderAudit(hosts.audit, gate.audit());
 }
 
-function requireFiniteNumber(raw: unknown, field: string): number {
-  const value = asRecord(raw)[field];
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`"${field}" must be a finite number`);
-  }
-  return value;
-}
-
-function defineCapabilities(): void {
-  // Persistent: discloses nothing about the person on its own.
-  gate.define<Record<string, never>, { capabilities: unknown }>('get_consent_state', {
-    description:
-      'Report which eligibility claims this person has currently permitted, and which are unavailable. Call this before attempting any check.',
-    annotations: { readOnlyHint: true },
-    persistent: true,
-    validate: () => ({}) as Record<string, never>,
-    execute: () => {
-      const { capabilities } = gate.snapshot();
-      return {
-        capabilities: capabilities.map((capability) => ({
-          name: capability.name,
-          available: capability.granted,
-          description: capability.description,
-        })),
-      };
+function renderProfileEditor(): void {
+  renderProfile(hosts.profile, profile, {
+    update: (patch) => {
+      profile = { ...profile, ...patch };
+      saveProfile(profile);
+      // Verdicts depend on the profile, so they have to follow an edit.
+      render();
+    },
+    reset: () => {
+      profile = { ...DEFAULT_PROFILE };
+      clearProfile();
+      renderProfileEditor();
+      render();
     },
   });
-
-  // Consent-gated. Answers a comparison. The income itself is never in scope of
-  // any return value, which is what makes the adversarial demo beat work.
-  gate.define<{ threshold: number }, { belowThreshold: boolean; claim: string }>(
-    'check_income_threshold',
-    {
-      description:
-        'Answer whether this household\'s annual income is below a given threshold. Returns only true or false, never the income itself.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          threshold: { type: 'number', description: 'Annual income threshold in whole currency units.' },
-        },
-        required: ['threshold'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true },
-      validate: (raw) => ({ threshold: requireFiniteNumber(raw, 'threshold') }),
-      execute: ({ threshold }) => ({
-        belowThreshold: PROFILE.annualIncome < threshold,
-        claim: `income below ${threshold}`,
-      }),
-      summarize: ({ threshold }) => `compared income against ${threshold}`,
-    },
-  );
-
-  gate.define<{ minimumAge: number }, { meetsMinimum: boolean; claim: string }>(
-    'check_age_requirement',
-    {
-      description:
-        'Answer whether this person meets a minimum age requirement. Returns only true or false, never a date of birth or exact age.',
-      inputSchema: {
-        type: 'object',
-        properties: { minimumAge: { type: 'number', description: 'Minimum age in years.' } },
-        required: ['minimumAge'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true },
-      validate: (raw) => ({ minimumAge: requireFiniteNumber(raw, 'minimumAge') }),
-      execute: ({ minimumAge }) => ({
-        meetsMinimum: PROFILE.age >= minimumAge,
-        claim: `at least ${minimumAge} years old`,
-      }),
-      summarize: ({ minimumAge }) => `confirmed age against minimum ${minimumAge}`,
-    },
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Console rendering
- * ------------------------------------------------------------------ */
-
-const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-
-function renderConsole(snapshot: GateSnapshot): void {
-  const host = document.getElementById('console');
-  if (!host) return;
-  host.textContent = '';
-
-  for (const capability of snapshot.capabilities) {
-    if (!capability.granted) continue;
-
-    const el = document.createElement('div');
-    el.className = 'capability';
-    el.dataset.persistent = String(capability.persistent);
-
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = capability.name;
-
-    const kind = document.createElement('span');
-    kind.className = 'kind';
-    kind.textContent = capability.persistent
-      ? 'always on'
-      : capability.readOnly
-        ? 'read'
-        : 'write';
-
-    const desc = document.createElement('span');
-    desc.className = 'desc';
-    desc.textContent = capability.description;
-
-    el.append(name, kind, desc);
-
-    if (capability.expiresAt !== null) {
-      const expiry = document.createElement('span');
-      expiry.className = 'expiry';
-      const seconds = Math.max(0, Math.round((capability.expiresAt - Date.now()) / 1000));
-      expiry.textContent = `expires ${RELATIVE.format(seconds, 'second')}`;
-      el.append(expiry);
-    }
-
-    host.append(el);
-  }
-}
-
-function renderAudit(entries: readonly AuditEntry[]): void {
-  const host = document.getElementById('audit');
-  if (!host) return;
-  host.textContent = '';
-
-  for (const entry of entries.slice(-40).reverse()) {
-    const li = document.createElement('li');
-    li.dataset.type = entry.type;
-
-    const time = document.createElement('time');
-    const at = new Date(entry.at);
-    time.dateTime = at.toISOString();
-    time.textContent = at.toLocaleTimeString([], { hour12: false });
-
-    const tag = document.createElement('span');
-    tag.className = 'tag';
-    tag.textContent = entry.type;
-
-    const detail = document.createElement('span');
-    detail.textContent = describe(entry);
-
-    li.append(time, tag, detail);
-    host.append(li);
-  }
-}
-
-function describe(entry: AuditEntry): string {
-  switch (entry.type) {
-    case 'granted':
-      return `${entry.name}${entry.ttlMs === null ? '' : ` for ${Math.round(entry.ttlMs / 1000)}s`}${entry.reason ? ` (${entry.reason})` : ''}`;
-    case 'revoked':
-      return `${entry.name} (${entry.cause})`;
-    case 'called':
-      return entry.summary;
-    case 'denied':
-      return `${entry.name}: ${entry.code} — ${entry.message}`;
-    case 'requested':
-      return `${entry.name} (${entry.reason})`;
-  }
-}
-
-/* ------------------------------------------------------------------ *
- * Controls
- * ------------------------------------------------------------------ */
-
-const GRANT_TTL_MS = 60_000;
-
-function renderControls(): void {
-  const host = document.getElementById('controls');
-  if (!host) return;
-  host.textContent = '';
-
-  const revocable = gate.snapshot().capabilities.filter((capability) => !capability.persistent);
-
-  for (const capability of revocable) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    const label = capability.name.replace(/^check_/, '').replace(/_/g, ' ');
-    button.textContent = capability.granted ? `Revoke ${label}` : `Grant ${label}`;
-    button.dataset.variant = capability.granted ? 'revoke' : 'grant';
-    button.disabled = !gate.available;
-    button.addEventListener('click', async () => {
-      button.disabled = true;
-      try {
-        if (gate.isGranted(capability.name)) {
-          gate.revoke(capability.name);
-        } else {
-          await gate.grant(capability.name, {
-            ttlMs: GRANT_TTL_MS,
-            reason: 'granted from the console',
-          });
-        }
-      } catch (error) {
-        console.error('capability toggle failed', error);
-      } finally {
-        renderControls();
-      }
-    });
-    host.append(button);
-  }
 }
 
 /* ------------------------------------------------------------------ *
  * Diagnostics
  *
- * A deliberate debug affordance. The origin-isolation requirement cannot be
- * verified on localhost, so there has to be a way to confirm on the deployed
- * URL that WebMCP is genuinely available and that tools really registered.
- * Reports state only, and exposes no profile data.
+ * A deliberate debug affordance for verifying a deployment, since origin
+ * isolation cannot be checked on localhost. Reports state only, never profile
+ * data.
  * ------------------------------------------------------------------ */
 
 export interface Diagnostics {
@@ -298,17 +105,24 @@ export interface Diagnostics {
   webmcpAvailable: boolean;
   origin: string;
   definedCapabilities: number;
+  grantedCapabilities: string[];
   liveToolNames: string[];
+  auditEntries: number;
 }
 
 async function diagnostics(): Promise<Diagnostics> {
+  const snapshot = gate.snapshot();
   return {
     isSecureContext: window.isSecureContext,
     originAgentCluster: window.originAgentCluster ?? null,
     webmcpAvailable: gate.available,
     origin: window.location.origin,
-    definedCapabilities: gate.snapshot().capabilities.length,
+    definedCapabilities: snapshot.capabilities.length,
+    grantedCapabilities: snapshot.capabilities
+      .filter((capability) => capability.granted)
+      .map((capability) => capability.name),
     liveToolNames: await gate.liveToolNames(),
+    auditEntries: gate.audit().length,
   };
 }
 
@@ -325,22 +139,24 @@ declare global {
 async function boot(): Promise<void> {
   window.proofNotProfile = { diagnostics };
 
-  renderEnvironment();
-  defineCapabilities();
+  registerCapabilities({ gate, getProfile });
 
-  gate.subscribe((snapshot) => {
-    renderConsole(snapshot);
-    renderAudit(gate.audit());
-  });
+  renderEnvironment(hosts.env, gate.available);
+  renderProfileEditor();
+
+  // subscribe() emits immediately, so this performs the first render.
+  gate.subscribe(() => render());
 
   if (gate.available) {
     await gate.start();
   }
 
-  renderControls();
-
-  // Keep expiry countdowns honest without re-rendering the whole page.
-  setInterval(() => renderConsole(gate.snapshot()), 1000);
+  // Expiry countdowns tick without waiting for a gate event.
+  setInterval(() => {
+    if (gate.snapshot().capabilities.some((capability) => capability.expiresAt !== null)) {
+      render();
+    }
+  }, 1000);
 }
 
 void boot();

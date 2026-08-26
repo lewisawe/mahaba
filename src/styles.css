@@ -270,3 +270,269 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
   color: var(--text-faint);
 }
 .footer p { margin: 0; }
+
+/* ------------------------------------------------------------------ *
+ * Panel headings
+ * ------------------------------------------------------------------ */
+
+.panel-head { margin-bottom: var(--space-4); }
+.panel-head h2 { margin-bottom: var(--space-1); }
+
+.panel-note {
+  margin: 0;
+  max-width: 64ch;
+  font-size: 13.5px;
+  color: var(--text-faint);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The console is the hero, so it gets more presence than the other panels. */
+.panel-console {
+  border-color: var(--line-strong);
+  background: linear-gradient(180deg, #161b21, var(--surface));
+}
+
+.capability .calls {
+  grid-column: 1 / -1;
+  font: 12px var(--mono);
+  color: var(--text-faint);
+}
+
+.capability[data-expiring="true"] { border-left-color: var(--warn); }
+
+/* ------------------------------------------------------------------ *
+ * Pending consent requests
+ * ------------------------------------------------------------------ */
+
+.panel-pending {
+  border-color: #2f4a6b;
+  background: linear-gradient(180deg, #141d29, var(--surface));
+}
+
+.request {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.request + .request { margin-top: var(--space-3); }
+
+.request-title { margin: 0; font-weight: 600; }
+.request-reason { margin: 0; color: var(--text); }
+.request-reason q { font-style: italic; }
+.quiet { color: var(--text-faint); }
+
+.request-discloses {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.request-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ------------------------------------------------------------------ *
+ * Claims
+ * ------------------------------------------------------------------ */
+
+.claims { display: grid; gap: var(--space-2); }
+
+.claim {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.claim[data-granted="true"] { border-left-color: var(--ok); }
+.claim-write[data-granted="true"] { border-left-color: var(--warn); }
+
+.claim-meta { display: grid; gap: var(--space-1); }
+.claim-label { margin: 0; font-weight: 600; font-size: 14.5px; }
+.claim-discloses { margin: 0; font-size: 13px; color: var(--text-faint); max-width: 62ch; }
+.claim-expiry { margin: 0; font: 12px var(--mono); color: var(--ok); }
+
+@media (max-width: 560px) {
+  .claim { grid-template-columns: 1fr; }
+  .claim button { justify-self: start; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Programmes
+ * ------------------------------------------------------------------ */
+
+.programs {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.program {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.program[data-verdict="eligible"] { border-top-color: var(--ok); }
+.program[data-verdict="ineligible"] { border-top-color: var(--danger); }
+.program[data-verdict="undetermined"] { border-top-color: var(--line-strong); }
+
+.program-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.program-name { margin: 0; font-size: 15.5px; font-weight: 600; }
+.program-value { font: 12px var(--mono); color: var(--text-dim); white-space: nowrap; }
+.program-authority { margin: 0; font-size: 12px; color: var(--text-faint); }
+.program-summary { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+
+.program-verdict {
+  margin: var(--space-1) 0 0;
+  font: 600 12px var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.program[data-verdict="eligible"] .program-verdict { color: var(--ok); }
+.program[data-verdict="ineligible"] .program-verdict { color: var(--danger); }
+.program[data-verdict="undetermined"] .program-verdict { color: var(--text-faint); }
+
+.requirements {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.requirements li {
+  display: grid;
+  grid-template-columns: 2ch 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.requirements .mark { font-family: var(--mono); font-weight: 700; }
+.requirements li[data-status="met"] .mark { color: var(--ok); }
+.requirements li[data-status="not_met"] .mark { color: var(--danger); }
+.requirements li[data-status="unverified"] .mark { color: var(--text-faint); }
+.requirements li[data-status="unverified"] { color: var(--text-faint); }
+
+/* ------------------------------------------------------------------ *
+ * Collapsible panels
+ * ------------------------------------------------------------------ */
+
+.panel-details { padding: 0; }
+
+.panel-details summary {
+  padding: var(--space-4) var(--space-6);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+.panel-details summary::-webkit-details-marker { display: none; }
+.panel-details summary::before {
+  content: "\25B8";
+  color: var(--text-faint);
+  transition: transform 140ms ease;
+}
+.panel-details[open] summary::before { transform: rotate(90deg); }
+.panel-details summary h2 { margin: 0; }
+.panel-details summary:focus-visible { outline: 2px solid var(--live); outline-offset: -2px; }
+
+.panel-details > .panel-note,
+.panel-details > #profile,
+.panel-details > #env {
+  padding: 0 var(--space-6) var(--space-6);
+}
+.panel-details > .panel-note { padding-bottom: var(--space-4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-details summary::before { transition: none; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Profile editor
+ * ------------------------------------------------------------------ */
+
+.fields {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: var(--space-4);
+}
+
+.field { display: grid; gap: var(--space-1); align-content: start; }
+
+.field-inline {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.field-label { font-size: 13px; color: var(--text-dim); }
+.field-hint { margin: 0; font-size: 12px; color: var(--text-faint); }
+
+input[type="number"],
+input[type="date"],
+select {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+}
+
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--live);
+}
+
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 1px;
+}
+
+.reset { font-size: 13px; }
+
+/* ------------------------------------------------------------------ *
+ * Disclosure log
+ * ------------------------------------------------------------------ */
+
+.audit .entry-detail { overflow-wrap: anywhere; }
+.audit li[data-type="called"] .tag { color: var(--live); }

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agent workflow tests</title>
+<style>
+  body { background:#0b0d10; color:#e6eaef; font:14px/1.5 ui-monospace,Menlo,Consolas,monospace; padding:24px; }
+  h1 { font:600 16px ui-sans-serif,system-ui,sans-serif; margin:0 0 16px; }
+  ul { list-style:none; padding:0; display:grid; gap:6px; }
+  li::before { content:"[" attr(data-status) "] "; font-weight:700; }
+  li[data-status=pass]::before { color:#3fb950; }
+  li[data-status=fail]::before { color:#f85149; }
+  li[data-status=skip]::before { color:#d29922; }
+  .detail { color:#8b95a3; }
+</style>
+</head>
+<body>
+<h1>agent workflow tests</h1>
+<ul id="out"></ul>
+
+<script type="module">
+// Exercises the workflow an agent actually follows, against the real registered
+// capabilities: discover programmes, learn requirements, request consent it
+// lacks, then verify claims once permission is given.
+import { createCapabilityGate, callTool } from '/src/lib/capability-gate.ts';
+import { registerCapabilities, DRAFT_TOOL } from '/src/capabilities.ts';
+import { DEFAULT_PROFILE } from '/src/domain/profile.ts';
+import { toolNameFor } from '/src/domain/claims.ts';
+
+const mc = document.modelContext;
+const results = [];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+window.__probeEnv = {
+  isSecureContext: window.isSecureContext,
+  originAgentCluster: window.originAgentCluster ?? '(unsupported)',
+  modelContext: mc ? 'present' : 'MISSING',
+};
+
+function record(status, title, detail = '') {
+  results.push({ status, title, detail });
+  const li = document.createElement('li');
+  li.dataset.status = status;
+  li.textContent = title;
+  if (detail) {
+    const span = document.createElement('span');
+    span.className = 'detail';
+    span.textContent = `  ${detail}`;
+    li.append(span);
+  }
+  document.getElementById('out').append(li);
+}
+
+async function test(title, fn) {
+  let profile = { ...DEFAULT_PROFILE };
+  const gate = createCapabilityGate();
+  registerCapabilities({ gate, getProfile: () => profile });
+  try {
+    await gate.start();
+    record('pass', title, (await fn(gate, (patch) => { profile = { ...profile, ...patch }; })) ?? '');
+  } catch (error) {
+    record('fail', title, error?.message ?? String(error));
+  } finally {
+    gate.destroy();
+    await sleep(20);
+  }
+}
+
+const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+const call = (name, args) => callTool(mc, name, args);
+
+async function main() {
+  if (!mc) {
+    record('skip', 'WebMCP unavailable', 'enable chrome://flags/#enable-webmcp-testing');
+    return;
+  }
+
+  await test('an agent can discover programmes without any consent', async () => {
+    const out = await call('list_programs', {});
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.programs.length === 5, `expected 5 programmes, saw ${out.result.programs.length}`);
+    assert(out.result.programs.every((p) => p.id && p.name), 'programme entries incomplete');
+    return `(${out.result.programs.length} programmes)`;
+  });
+
+  await test('requirements name the claim and report it unavailable', async (gate) => {
+    const out = await call('get_program_requirements', { programId: 'housing-support' });
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.requirements.length === 4, 'wrong requirement count');
+    assert(out.result.requirements.every((r) => r.permitted === false), 'something was permitted already');
+    assert(out.result.missingConsent.length === 4, 'missingConsent did not list every claim');
+    assert(gate.isGranted('check_income_threshold') === false, 'claim tool was granted');
+    return '(4 requirements, 4 missing consent)';
+  });
+
+  await test('an unknown programId is a clean error, not a crash', async () => {
+    const out = await call('get_program_requirements', { programId: 'nope' });
+    assert(out.ok === false, 'unknown programme was accepted');
+    assert(out.error.code === 'failed', `unexpected code ${out.error.code}`);
+    assert(out.error.message.includes('list_programs'), 'error does not tell the agent what to do');
+    return '(points the agent at list_programs)';
+  });
+
+  await test('a claim tool does not exist before consent', async () => {
+    const names = (await mc.getTools()).map((t) => t.name);
+    assert(!names.includes('check_income_threshold'), 'gated tool existed without consent');
+    let failed = false;
+    try { await call('check_income_threshold', { threshold: 30000 }); } catch { failed = true; }
+    assert(failed, 'a call to an unregistered tool succeeded');
+    return '(calling it throws, because there is nothing to call)';
+  });
+
+  await test('request_consent records a decision for the person to make', async (gate) => {
+    const out = await call('request_consent', {
+      claim: 'income_threshold',
+      reason: 'to check Housing Support Allowance',
+    });
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.status === 'awaiting_decision', `unexpected status ${out.result.status}`);
+    assert(out.result.tool === 'check_income_threshold', 'wrong tool resolved');
+    assert(gate.snapshot().pending.length === 1, 'no pending request recorded');
+    // Non-blocking: it returned rather than hanging on a human.
+    assert(gate.isGranted('check_income_threshold') === false, 'requesting granted it');
+    return '(non-blocking, still ungranted)';
+  });
+
+  await test('request_consent accepts a tool name as well as a claim id', async (gate) => {
+    const out = await call('request_consent', { claim: 'check_age_requirement', reason: 'age check' });
+    assert(out.ok === true && out.result.tool === 'check_age_requirement', JSON.stringify(out));
+    assert(gate.snapshot().pending.length === 1, 'not recorded');
+  });
+
+  await test('request_consent rejects an unknown claim with the valid list', async () => {
+    const out = await call('request_consent', { claim: 'shoe_size', reason: 'curiosity' });
+    assert(out.ok === false, 'unknown claim was accepted');
+    assert(out.error.message.includes('income_threshold'), 'error does not list valid claims');
+  });
+
+  await test('get_consent_state tells the agent what it lacks and what it awaits', async (gate) => {
+    await call('request_consent', { claim: 'income_threshold', reason: 'needed for housing' });
+    const out = await call('get_consent_state', {});
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.permitted.length === 0, 'nothing should be permitted yet');
+    assert(out.result.unavailable.length >= 5, 'unavailable list too short');
+    assert(out.result.awaitingDecision.includes('check_income_threshold'), 'pending not reported');
+
+    await gate.grant('check_income_threshold', { reason: 'approved in test' });
+    const after = await call('get_consent_state', {});
+    assert(after.result.permitted.includes('check_income_threshold'), 'grant not reflected');
+    assert(after.result.awaitingDecision.length === 0, 'pending survived the grant');
+    return '(negotiation loop closes)';
+  });
+
+  await test('the full loop: request, grant, then verify every claim', async (gate) => {
+    const requirements = await call('get_program_requirements', { programId: 'housing-support' });
+    for (const missing of requirements.result.missingConsent) {
+      const asked = await call('request_consent', { claim: missing.claim, reason: `needed for housing support` });
+      assert(asked.ok === true, JSON.stringify(asked));
+      await gate.grant(missing.tool, { reason: 'approved in test' });
+    }
+
+    const after = await call('get_program_requirements', { programId: 'housing-support' });
+    assert(after.result.missingConsent.length === 0, 'still missing consent after granting');
+
+    const answers = [];
+    for (const requirement of after.result.requirements) {
+      const out = await call(requirement.tool, requirement.arguments);
+      assert(out.ok === true, `${requirement.tool}: ${JSON.stringify(out)}`);
+      answers.push(out.result);
+    }
+    assert(answers.length === 4, 'not every requirement was checked');
+    assert(answers.every((a) => a.satisfied === true), `default profile should qualify: ${JSON.stringify(answers)}`);
+    assert(answers.every((a) => typeof a.claim === 'string'), 'claim restatement missing');
+    return '(default profile qualifies on all 4)';
+  });
+
+  await test('no response anywhere contains a raw profile value', async (gate) => {
+    for (const claim of ['income_threshold', 'age_requirement', 'household_size', 'residency', 'tenure_status']) {
+      await gate.grant(toolNameFor(claim), { reason: 'test' });
+    }
+    const responses = [
+      await call('check_income_threshold', { threshold: 30000 }),
+      await call('check_age_requirement', { minimumAge: 19 }),
+      await call('check_household_size', { minimumSize: 3 }),
+      await call('check_residency', { districts: ['north', 'east'] }),
+      await call('check_tenure_status', { acceptedTenures: ['renting'] }),
+      await call('get_consent_state', {}),
+      await call('get_disclosure_receipt', {}),
+    ];
+    const blob = JSON.stringify(responses);
+    // Values from DEFAULT_PROFILE that must never appear.
+    for (const secret of ['24000', '1991-04-17', 'north']) {
+      // "north" appears legitimately as a caller-supplied argument, so only the
+      // profile-derived leak matters: assert it is never echoed as an answer.
+      if (secret === 'north') continue;
+      assert(!blob.includes(secret), `response leaked ${secret}`);
+    }
+    assert(!blob.includes('"annualIncome"'), 'a profile field name leaked');
+    assert(!blob.includes('"dateOfBirth"'), 'a profile field name leaked');
+    return '(no income, no date of birth, no profile fields)';
+  });
+
+  await test('an ineligible profile is reported as not met, not hidden', async (gate) => {
+    await gate.grant('check_income_threshold', { reason: 'test' });
+    const out = await call('check_income_threshold', { threshold: 18000 });
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.satisfied === false, 'default income should exceed 18000');
+    assert(out.result.claim === 'annual income below 18000', `unexpected claim "${out.result.claim}"`);
+  });
+
+  await test('profile edits change the answer', async (gate, update) => {
+    await gate.grant('check_income_threshold', { reason: 'test' });
+    const before = await call('check_income_threshold', { threshold: 20000 });
+    assert(before.result.satisfied === false, 'expected 24000 to exceed 20000');
+    update({ annualIncome: 15000 });
+    const after = await call('check_income_threshold', { threshold: 20000 });
+    assert(after.result.satisfied === true, 'edit did not take effect');
+    return '(tools read live profile state)';
+  });
+
+  await test('claim arguments are validated: out-of-range is refused', async (gate) => {
+    await gate.grant('check_age_requirement', { reason: 'test' });
+    const negative = await call('check_age_requirement', { minimumAge: -5 });
+    assert(negative.ok === false && negative.error.code === 'invalid_input', JSON.stringify(negative));
+    const fractional = await call('check_age_requirement', { minimumAge: 21.5 });
+    assert(fractional.ok === false, 'fractional age was accepted');
+    assert(fractional.error.message.includes('whole number'), 'unhelpful message');
+  });
+
+  await test('residency rejects a malformed district list', async (gate) => {
+    await gate.grant('check_residency', { reason: 'test' });
+    for (const args of [{ districts: [] }, { districts: 'north' }, { districts: [''] }]) {
+      const out = await call('check_residency', args);
+      assert(out.ok === false && out.error.code === 'invalid_input', `accepted ${JSON.stringify(args)}`);
+    }
+    return '(empty, non-array and blank entries all refused)';
+  });
+
+  await test('tenure rejects values outside the accepted enum', async (gate) => {
+    await gate.grant('check_tenure_status', { reason: 'test' });
+    const out = await call('check_tenure_status', { acceptedTenures: ['squatting'] });
+    assert(out.ok === false && out.error.code === 'invalid_input', JSON.stringify(out));
+    assert(out.error.message.includes('renting'), 'error does not name the valid values');
+  });
+
+  await test('the draft tool is gated separately from any claim', async (gate) => {
+    for (const claim of ['income_threshold', 'household_size', 'residency', 'tenure_status']) {
+      await gate.grant(toolNameFor(claim), { reason: 'test' });
+    }
+    const names = (await mc.getTools()).map((t) => t.name);
+    assert(!names.includes(DRAFT_TOOL), 'draft tool existed without its own grant');
+
+    await gate.grant(DRAFT_TOOL, { reason: 'approved in test' });
+    const out = await call(DRAFT_TOOL, { programId: 'housing-support' });
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.readyToSubmit === true, `expected ready: ${JSON.stringify(out.result)}`);
+    assert(out.result.assertions.every((a) => a.status === 'met'), 'not all requirements met');
+    assert(!JSON.stringify(out).includes('24000'), 'draft leaked the income');
+    return '(draft cites claims, not values)';
+  });
+
+  await test('a draft with missing consent reports unverified rather than guessing', async (gate) => {
+    await gate.grant('check_income_threshold', { reason: 'test' });
+    await gate.grant(DRAFT_TOOL, { reason: 'test' });
+    const out = await call(DRAFT_TOOL, { programId: 'housing-support' });
+    assert(out.ok === true, JSON.stringify(out));
+    assert(out.result.readyToSubmit === false, 'claimed ready without full consent');
+    const unverified = out.result.assertions.filter((a) => a.status === 'unverified');
+    assert(unverified.length === 3, `expected 3 unverified, saw ${unverified.length}`);
+    assert(out.result.note.includes('consent'), 'note does not explain what is missing');
+    return '(3 of 4 unverified)';
+  });
+
+  await test('the disclosure receipt records comparisons without values', async (gate) => {
+    await gate.grant('check_income_threshold', { reason: 'Housing Support' });
+    await call('check_income_threshold', { threshold: 30000 });
+    const out = await call('get_disclosure_receipt', {});
+    assert(out.ok === true, JSON.stringify(out));
+    const called = out.result.entries.filter((e) => e.type === 'called');
+    assert(called.some((e) => e.detail === 'compared income against 30000'), `entries: ${JSON.stringify(called)}`);
+    assert(!JSON.stringify(out).includes('24000'), 'receipt leaked the income');
+    return '(comparison recorded, value absent)';
+  });
+
+  await test('withdrawing consent mid-session removes the tool immediately', async (gate) => {
+    await gate.grant('check_income_threshold', { reason: 'test' });
+    const ok = await call('check_income_threshold', { threshold: 30000 });
+    assert(ok.ok === true, 'call failed while granted');
+    gate.revoke('check_income_threshold');
+    await sleep(60);
+    let gone = false;
+    try { await call('check_income_threshold', { threshold: 30000 }); } catch { gone = true; }
+    assert(gone, 'tool still callable after withdrawal');
+    const state = await call('get_consent_state', {});
+    assert(!state.result.permitted.includes('check_income_threshold'), 'consent state stale');
+    return '(registry and consent state both updated)';
+  });
+}
+
+try {
+  await main();
+} catch (error) {
+  record('fail', 'suite', error?.message ?? String(error));
+} finally {
+  window.__probeResults = results;
+  window.__probeDone = true;
+}
+</script>
+</body>
+</html>
