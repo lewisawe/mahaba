@@ -9,6 +9,11 @@ permits them.
 
 Built for [The WebMCP Challenge](https://webmcp.devpost.com/).
 
+**Live: [mahabari.netlify.app](https://mahabari.netlify.app/)**
+
+Open it in the ChatGPT in-app browser, or in Chrome 149+ with
+`chrome://flags/#enable-webmcp-testing` enabled.
+
 > Status: in development. Synthetic demo data only, held in the browser.
 
 ---

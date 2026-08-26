@@ -120,12 +120,19 @@ async function main() {
   await send('Runtime.enable');
 
   const evaluate = async (expression) => {
-    const { result } = await send('Runtime.evaluate', {
+    const response = await send('Runtime.evaluate', {
       expression,
       returnByValue: true,
       awaitPromise: true,
     });
-    return result.value;
+    // Without this, a thrown Error serialises to {} under returnByValue, because
+    // Error has no enumerable own properties. Silent empty results follow.
+    if (response.exceptionDetails) {
+      const details = response.exceptionDetails;
+      const text = details.exception?.description ?? details.text ?? 'evaluation threw';
+      throw new Error(text.split('\n')[0]);
+    }
+    return response.result.value;
   };
 
   // --eval mode: run one expression against the loaded page and print it.
