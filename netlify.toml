@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
 # WebMCP is only available in origin-isolated documents. Without this header the
 # agent cluster is site-keyed, registerTool() rejects with SecurityError, and the

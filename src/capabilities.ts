@@ -182,13 +182,13 @@ export function registerCapabilities({ gate, getProfile }: RegisterOptions): voi
 
   gate.define('get_disclosure_receipt', {
     description:
-      'Return the append-only record of what has been disclosed in this session: which claims were permitted, compared, denied and withdrawn. Contains no personal values.',
+      'Return a signed, verifiable record of what has been disclosed in this session: which claims were permitted, compared, denied and withdrawn. Contains no personal values. The signature is produced server-side and can be re-verified.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     persistent: true,
     validate: () => ({}),
-    execute: () => ({
-      entries: gate.audit().map((entry) => ({
+    execute: async () => {
+      const entries = gate.audit().map((entry) => ({
         type: entry.type,
         at: new Date(entry.at).toISOString(),
         detail:
@@ -197,8 +197,45 @@ export function registerCapabilities({ gate, getProfile }: RegisterOptions): voi
             : entry.type === 'denied'
               ? `${entry.name}: ${entry.message}`
               : entry.name,
-      })),
-    }),
+      }));
+
+      // Ask the signing function for an HMAC over the entries. The signing key
+      // never reaches the browser, so the receipt cannot be forged client-side.
+      // If the function is unreachable, still return the entries rather than
+      // failing the tool: the record is useful even unsigned, and the agent is
+      // told which it got.
+      try {
+        const response = await fetch('/.netlify/functions/sign-receipt', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ mode: 'sign', entries }),
+        });
+        if (!response.ok) throw new Error(`signing returned ${response.status}`);
+        const signed = (await response.json()) as {
+          signature: string;
+          algorithm: string;
+          receipt: { issuedAt: string; issuer: string };
+          verify: string;
+        };
+        return {
+          signed: true,
+          issuer: signed.receipt.issuer,
+          issuedAt: signed.receipt.issuedAt,
+          algorithm: signed.algorithm,
+          signature: signed.signature,
+          verify: signed.verify,
+          entries,
+        };
+      } catch (error) {
+        return {
+          signed: false,
+          note:
+            'Signing service unavailable; returning the unsigned disclosure log. ' +
+            (error instanceof Error ? error.message : 'unknown error'),
+          entries,
+        };
+      }
+    },
   });
 
   /* ---------------- consent-gated, one per claim ---------------- */
