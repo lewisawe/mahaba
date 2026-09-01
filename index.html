@@ -12,7 +12,7 @@
 
 <header class="masthead">
   <p class="eyebrow">Proof, Not Profile</p>
-  <h1>The agent gets answers, not your data.</h1>
+  <h1>The agent gets answers, <br class="h1-break">not your data.</h1>
   <p class="lede">
     Eligibility forms ask for an exact salary when the decision only needs to know
     whether income is below a threshold. This wallet answers the question without
@@ -35,8 +35,8 @@
         <p class="tool-count" id="tool-count" aria-live="polite"></p>
       </div>
       <p class="panel-note">
-        Read from the browser's own tool registry. A withdrawn capability is not
-        disabled, it stops existing.
+        The browser's own tool registry. A withdrawn capability doesn't disable,
+        it stops existing.
       </p>
     </div>
     <div id="console" class="capabilities" aria-live="polite"></div>
@@ -54,10 +54,7 @@
   <section class="panel" aria-labelledby="claims-heading">
     <div class="panel-head">
       <h2 id="claims-heading">What you permit</h2>
-      <p class="panel-note">
-        Each row is one claim. Permitting it registers a single tool that answers
-        one comparison and returns nothing else.
-      </p>
+      <p class="panel-note">One claim, one tool. It answers a comparison and returns nothing else.</p>
     </div>
     <div id="claims" class="claims"></div>
   </section>
@@ -65,10 +62,7 @@
   <section class="panel" aria-labelledby="programs-heading">
     <div class="panel-head">
       <h2 id="programs-heading">Programmes</h2>
-      <p class="panel-note">
-        A requirement stays unresolved until the claim answering it is permitted.
-        Nothing is inferred from data the agent has not been allowed to test.
-      </p>
+      <p class="panel-note">A requirement stays unresolved until you permit the claim that answers it.</p>
     </div>
     <div id="programs" class="programs"></div>
   </section>
@@ -76,31 +70,20 @@
   <section class="panel" aria-labelledby="audit-heading">
     <div class="panel-head">
       <h2 id="audit-heading">Disclosure log</h2>
-      <p class="panel-note">
-        Append-only. Records which comparison was made, never the value it was
-        made against.
-      </p>
+      <p class="panel-note">Append-only. Records the comparison, never the value.</p>
     </div>
     <ol class="audit" id="audit"></ol>
   </section>
 
   <details class="panel panel-details">
     <summary><h2>Your details</h2></summary>
-    <p class="panel-note">
-      Synthetic data, held in this browser only. No tool returns any field from
-      it. Change anything and the programme verdicts follow.
-    </p>
+    <p class="panel-note">Synthetic, in this browser only. No tool returns any field from it.</p>
     <div id="profile"></div>
   </details>
 
   <details class="panel panel-details">
     <summary><h2>Environment</h2></summary>
-    <p class="panel-note">
-      WebMCP needs an origin-isolated, secure document. If
-      <code>originAgentCluster</code> is false, the
-      <code>Origin-Agent-Cluster</code> header is not arriving and no tool can be
-      registered.
-    </p>
+    <p class="panel-note">WebMCP needs a secure, origin-isolated document to register tools.</p>
     <dl class="env" id="env"></dl>
   </details>
 

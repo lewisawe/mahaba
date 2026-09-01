@@ -32,14 +32,22 @@ function capabilityRow(capability: CapabilityState): HTMLElement {
       : 'write';
 
   const children = [
+    el('span', { class: 'dot', attrs: { 'aria-hidden': 'true' } }),
     el('span', { class: 'name', text: capability.name }),
     el('span', { class: 'kind', text: kind }),
-    el('span', { class: 'desc', text: capability.description }),
   ];
 
-  // Urgency ramps in the final stretch so expiry reads on screen without
-  // anyone touching the page. The gate re-renders once a second while anything
-  // is expiring, so this stays live.
+  // Hierarchy: persistent tools are structural context, so they show name and
+  // tag only, with the full description available on hover. Consent-granted
+  // tools are the point of the demo, so they show their description and status
+  // inline and get visual promotion via the data-tier attribute.
+  if (!capability.persistent) {
+    children.push(el('span', { class: 'desc', text: capability.description }));
+  } else {
+    // Keep the detail reachable without spending vertical space on it.
+    children[0]!.setAttribute('title', capability.description);
+  }
+
   let urgency: 'calm' | 'soon' | 'imminent' = 'calm';
   if (capability.expiresAt !== null) {
     const seconds = secondsUntil(capability.expiresAt);
@@ -68,6 +76,7 @@ function capabilityRow(capability: CapabilityState): HTMLElement {
       data: {
         persistent: String(capability.persistent),
         expiring: String(capability.expiresAt !== null),
+        tier: capability.persistent ? 'structural' : 'granted',
         urgency,
       },
     },

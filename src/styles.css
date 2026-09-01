@@ -1,34 +1,73 @@
 /**
- * Proof, Not Profile — "paper ledger" theme.
+ * Proof, Not Profile — "midnight precision instrument".
  *
- * The interface reads like an official form and a disclosure receipt, because
- * that is what the product is: a record of exactly what was asked and answered.
- * Warm paper canvas, ink text, hairline rules, one official-blue accent for
- * live/interactive state, a stamp red for withdrawal and danger, a document
- * green for verified. Flat surfaces, no glow, elevation from contrast and rule
- * weight rather than shadow.
+ * Darkness as substrate, not theme. Near-black canvas, paper-white type at tight
+ * tracking in a low weight band, hairline borders doing the work shadows usually
+ * would, and a single amber accent used sparingly as a functional flashlight:
+ * it marks action and live capability, nothing else. The product UI, the
+ * capability console, is the only visual texture. Built to Linear's system with
+ * an accent of our own.
+ *
+ * Self-hosted Inter (latin subset) so the CSP font-src 'self' holds.
  */
 
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/src/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/src/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/src/fonts/inter-600.woff2') format('woff2');
+}
+
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* Paper and ink */
-  --bg: #f4f1ea;           /* warm paper canvas */
-  --surface: #fbfaf6;      /* card stock, slightly lighter than the page */
-  --surface-raised: #ffffff; /* the whitest surface: rows, inputs, receipts */
-  --line: #d9d3c5;         /* hairline rule on paper */
-  --line-strong: #b7ae99;  /* heavier rule, ledger divider */
+  /* Neutrals — darkness as substrate */
+  --void: #08090a;         /* page canvas */
+  --carbon: #0f1011;       /* card surfaces, panels */
+  --obsidian: #161718;     /* elevated surfaces, rows */
+  --graphite: #23252a;     /* low-contrast structural edges */
+  --smoke: #383b3f;        /* hairline borders, higher contrast */
+  --ash: #62666d;          /* muted body text, inactive */
+  --fog: #8a8f98;          /* tertiary text, placeholders */
+  --mist: #d0d6e0;         /* secondary headings, button text */
+  --bone: #e5e5e6;         /* near-white fills */
+  --paper: #ffffff;        /* primary headings, max-contrast */
 
-  --text: #1b1a17;         /* near-black ink */
-  --text-dim: #55514a;     /* secondary ink */
-  --text-faint: #8a8477;   /* faint pencil */
+  /* Semantic mapping onto the neutral scale */
+  --bg: var(--void);
+  --surface: var(--carbon);
+  --surface-raised: var(--obsidian);
+  --line: var(--graphite);
+  --line-strong: var(--smoke);
+  --text: var(--bone);
+  --text-dim: var(--fog);
+  --text-faint: var(--ash);
 
-  /* Signal colours. One accent (official blue) carries interactivity and live
-     state. The rest are reserved for meaning: granted/met, withdrawn, warning. */
-  --live: #1b4fa0;         /* official form blue: accents, focus, live capability */
-  --ok: #1f7a3d;           /* document green: granted, requirement met */
-  --warn: #9a6a12;         /* amber ink: approaching expiry, write-consent */
-  --danger: #a5311f;       /* stamp red: withdrawal, denial, not met */
+  /* The single functional accent — signal amber. Marks action and live
+     capability, used sparingly. This is the flashlight, not decoration. */
+  --accent: #e8b923;
+  --accent-dim: #8a7320;
+  --accent-wash: rgba(232, 185, 35, 0.10);
+
+  /* Status colours, kept muted so they read as signal, not decoration. */
+  --ok: #4bb06a;
+  --warn: #e8b923;
+  --danger: #eb5757;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -38,12 +77,18 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  /* Documents have square-ish corners. Keep radius small and restrained. */
-  --radius: 4px;
-  --radius-sm: 3px;
+  /* Precision-machined radii */
+  --radius: 12px;
+  --radius-sm: 6px;
 
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --tracking: -0.011em;
+  --tracking-tight: -0.022em;
+
+  /* Motion: strong custom curves, not the weak built-in easings. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 *,
@@ -52,17 +97,16 @@
 
 body {
   margin: 0;
-  padding: var(--space-8) var(--space-6) var(--space-12);
+  padding: var(--space-12) var(--space-6);
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.6 var(--sans);
+  font: 400 15px/1.6 var(--sans);
+  letter-spacing: var(--tracking);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.skip-link {
-  position: absolute;
-  left: -9999px;
-}
+.skip-link { position: absolute; left: -9999px; }
 .skip-link:focus {
   left: var(--space-4);
   top: var(--space-4);
@@ -77,59 +121,67 @@ body {
 .masthead,
 main,
 .footer {
-  max-width: 860px;
+  max-width: 880px;
   margin-inline: auto;
 }
 
-/* The masthead reads like the header of an official document: a ruled line
-   under an eyebrow label, then the title. */
 .masthead {
-  margin-bottom: var(--space-8);
-  padding-bottom: var(--space-6);
-  border-bottom: 2px solid var(--text);
+  margin-bottom: var(--space-12);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--line);
 }
 
 .eyebrow {
-  margin: 0 0 var(--space-2);
-  font: 600 12px/1 var(--mono);
-  letter-spacing: 0.14em;
+  margin: 0 0 var(--space-4);
+  font: 500 12px/1 var(--mono);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--live);
+  color: var(--accent);
 }
 
 h1 {
-  margin: 0 0 var(--space-3);
-  font-size: clamp(26px, 4.4vw, 38px);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.015em;
+  margin: 0 0 var(--space-4);
+  font-size: clamp(30px, 5vw, 52px);
+  font-weight: 510;
+  line-height: 1.04;
+  letter-spacing: var(--tracking-tight);
+  color: var(--paper);
   text-wrap: balance;
 }
 
+/* Controlled line break on the hero, only where there's room. Narrow screens
+   wrap naturally. */
+.h1-break { display: none; }
+@media (min-width: 620px) { .h1-break { display: inline; } }
+
 .lede {
   margin: 0;
-  max-width: 62ch;
+  max-width: 64ch;
   color: var(--text-dim);
+  font-size: 16px;
 }
 
 .lede-aside {
-  margin: var(--space-3) 0 0;
-  max-width: 62ch;
-  font-size: 13.5px;
+  margin: var(--space-4) 0 0;
+  max-width: 64ch;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
 a {
-  color: var(--live);
-  text-underline-offset: 2px;
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-dim);
+  padding-bottom: 1px;
+  transition: border-color 140ms ease;
 }
-a:hover { text-decoration-thickness: 2px; }
-a:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; border-radius: 2px; }
+a:hover { border-bottom-color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 
-main { display: grid; gap: var(--space-6); }
+main { display: grid; gap: var(--space-4); }
 
 .panel {
-  padding: var(--space-4) var(--space-6) var(--space-6);
+  padding: var(--space-6);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -137,24 +189,27 @@ main { display: grid; gap: var(--space-6); }
 
 .panel h2 {
   margin: 0 0 var(--space-2);
-  font: 600 12px/1 var(--mono);
+  font: 500 12px/1 var(--mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
 
-.note {
-  margin: 0 0 var(--space-4);
-  max-width: 64ch;
-  font-size: 13.5px;
+.note,
+.panel-note {
+  margin: 0;
+  max-width: 66ch;
+  font-size: 13px;
   color: var(--text-faint);
+  letter-spacing: 0;
 }
 
 code {
-  font: 0.92em var(--mono);
-  color: var(--text-dim);
-  background: #ece7db;
-  padding: 0.05em 0.35em;
+  font: 0.9em var(--mono);
+  color: var(--mist);
+  background: var(--void);
+  padding: 0.08em 0.4em;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
 }
 
@@ -167,212 +222,37 @@ code {
   gap: var(--space-3);
   align-items: baseline;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 .env dt { min-width: 20ch; color: var(--text-faint); }
-.env dd { margin: 0; overflow-wrap: anywhere; }
+.env dd { margin: 0; overflow-wrap: anywhere; color: var(--mist); }
 .env dd[data-state="good"] { color: var(--ok); }
 .env dd[data-state="bad"] { color: var(--danger); }
 
-/* Capability console */
-
-.capabilities { display: grid; gap: var(--space-2); min-height: 44px; }
-
-.capabilities:empty::after {
-  content: "The agent currently has no capabilities.";
-  color: var(--text-faint);
-  font-style: italic;
-}
-
-.capability {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-1) var(--space-4);
-  align-items: baseline;
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--live);
-  border-radius: var(--radius-sm);
-  animation: mount 200ms ease-out;
-}
-
-.capability[data-persistent="true"] { border-left-color: var(--line-strong); }
-
-/* Time-boxed grants shift colour as they approach expiry, so the console
-   visibly counts down without anyone touching the page. */
-.capability[data-expiring="true"][data-urgency="soon"] { border-left-color: var(--warn); }
-.capability[data-expiring="true"][data-urgency="imminent"] {
-  border-left-color: var(--danger);
-  animation: mount 200ms ease-out, pulse 900ms ease-in-out infinite;
-}
-.capability[data-urgency="soon"] .expiry { color: var(--warn); }
-.capability[data-urgency="imminent"] .expiry { color: var(--danger); font-weight: 600; }
-
-@keyframes mount {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: none; }
-}
-
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(165, 49, 31, 0); }
-  50% { box-shadow: 0 0 0 3px rgba(165, 49, 31, 0.15); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .capability { animation: none; }
-  .capability[data-expiring="true"][data-urgency="imminent"] { animation: none; }
-}
-
-.capability .name {
-  font: 600 13.5px var(--mono);
-  overflow-wrap: anywhere;
-}
-
-.capability .kind {
-  justify-self: end;
-  font: 11px/1 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  white-space: nowrap;
-}
-
-.capability .desc {
-  grid-column: 1 / -1;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.capability .expiry {
-  grid-column: 1 / -1;
-  font: 12px var(--mono);
-  color: var(--warn);
-}
-
-/* Controls */
-
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
-button {
-  min-height: 44px;
-  padding: var(--space-2) var(--space-4);
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease;
-}
-button:hover:not(:disabled) { background: #efeadd; }
-button:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-
-/* The grant action is the affirmative one: give it the official blue. */
-button[data-variant="grant"]:not(:disabled) {
-  border-color: var(--live);
-  color: var(--live);
-  font-weight: 600;
-}
-button[data-variant="grant"]:hover:not(:disabled) { background: #e7edf6; }
-
-button[data-variant="revoke"]:not(:disabled) {
-  border-color: #d6b7af;
-  color: var(--danger);
-}
-button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
-
-@media (prefers-reduced-motion: reduce) {
-  button { transition: none; }
-}
-
-/* Audit log */
-
-.audit {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: var(--space-1);
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.audit:empty::after {
-  content: "Nothing disclosed yet.";
-  color: var(--text-faint);
-  font-style: italic;
-}
-
-.audit li {
-  display: flex;
-  gap: var(--space-3);
-  align-items: baseline;
-  font: 12.5px var(--mono);
-  color: var(--text-dim);
-}
-
-.audit time { color: var(--text-faint); flex: none; }
-.audit .tag { flex: none; min-width: 9ch; }
-.audit li[data-type="granted"] .tag { color: var(--ok); }
-.audit li[data-type="revoked"] .tag { color: var(--danger); }
-.audit li[data-type="denied"] .tag { color: var(--danger); }
-.audit li[data-type="requested"] .tag { color: var(--live); }
-
-/* Footer */
-
-.footer {
-  margin-top: var(--space-12);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--text-faint);
-}
-.footer p { margin: 0; }
-
-/* ------------------------------------------------------------------ *
- * Panel headings
- * ------------------------------------------------------------------ */
+/* Panel headings */
 
 .panel-head { margin-bottom: var(--space-4); }
-.panel-head h2 { margin-bottom: var(--space-1); }
-
-.panel-note {
-  margin: 0;
-  max-width: 64ch;
-  font-size: 13.5px;
-  color: var(--text-faint);
-}
+.panel-head h2 { margin-bottom: var(--space-2); }
 
 .sr-only {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
 
-/* The console is the hero. On paper it earns presence through a heavier rule
-   and a faint tinted ground, not a glow. */
+/* ------------------------------------------------------------------ *
+ * Capability console — the hero. The only real visual texture.
+ * ------------------------------------------------------------------ */
+
 .panel-console {
   border-color: var(--line-strong);
-  border-top: 3px solid var(--live);
-  background: var(--surface-raised);
+  background: linear-gradient(180deg, #141517, var(--surface));
 }
 
-/* Live callable-tool count in the console header. This number moving is the
-   whole thesis made visible. */
 .console-headline {
   display: flex;
   flex-wrap: wrap;
@@ -384,15 +264,103 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   margin: 0;
   font: 12px var(--mono);
   color: var(--text-dim);
+  letter-spacing: 0;
 }
 .tool-count-n {
-  font-weight: 700;
-  color: var(--live);
-  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 14px;
 }
 
-/* Inspectable proof of the adversarial beat: raw-value tools that do not exist
-   in the registry, checked against ground truth. */
+.capabilities { display: grid; gap: var(--space-2); min-height: 44px; }
+.capabilities:empty::after {
+  content: "The agent currently has no capabilities.";
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.capability {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  animation: mount 260ms var(--ease-out);
+}
+
+/* State reads from a small status dot and surface tone, not a colored rail. */
+.capability .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--accent);
+}
+
+/* Structural (always-on) tools are context: compact, quiet, flat, no border. */
+.capability[data-tier="structural"] {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border-color: transparent;
+}
+.capability[data-tier="structural"] .name { color: var(--fog); font-weight: 400; }
+.capability[data-tier="structural"] .dot { background: var(--graphite); }
+
+/* Granted (consent) tools are the point: promoted surface, accent dot. */
+.capability[data-tier="granted"] {
+  background: linear-gradient(180deg, var(--accent-wash), var(--surface-raised));
+  border-color: var(--accent-dim);
+}
+.capability[data-tier="granted"] .name { color: var(--paper); }
+
+/* Stagger the console rows on first paint so the registry reads as assembling,
+   not dumping. Short delays only. */
+.capability:nth-child(1) { animation-delay: 0ms; }
+.capability:nth-child(2) { animation-delay: 40ms; }
+.capability:nth-child(3) { animation-delay: 80ms; }
+.capability:nth-child(4) { animation-delay: 120ms; }
+.capability:nth-child(5) { animation-delay: 160ms; }
+.capability:nth-child(n+6) { animation-delay: 200ms; }
+
+/* Expiry urgency shifts the dot and countdown colour, not a rail. */
+.capability[data-urgency="soon"] .dot { background: var(--warn); }
+.capability[data-urgency="imminent"] .dot { background: var(--danger); }
+.capability[data-urgency="imminent"] {
+  animation: mount 260ms var(--ease-out), pulse 900ms ease-in-out infinite;
+}
+.capability[data-urgency="soon"] .expiry { color: var(--warn); }
+.capability[data-urgency="imminent"] .expiry { color: var(--danger); font-weight: 600; }
+
+@keyframes mount {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(235, 87, 87, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(235, 87, 87, 0.16); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capability,
+  .capability[data-urgency="imminent"] { animation: none; }
+}
+
+.capability .name { font: 500 13px var(--mono); color: var(--bone); overflow-wrap: anywhere; }
+.capability .kind {
+  justify-self: end;
+  font: 10.5px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.capability .desc { grid-column: 2 / -1; font-size: 13px; color: var(--text-dim); letter-spacing: 0; }
+.capability .expiry { grid-column: 2 / -1; font: 12px var(--mono); color: var(--accent); }
+.capability .calls { grid-column: 2 / -1; font: 12px var(--mono); color: var(--text-faint); }
+
+/* Inspectable absence: raw-value tools that do not exist in the registry. */
 .cannot {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
@@ -400,8 +368,8 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
 }
 .cannot-head {
   margin: 0 0 var(--space-2);
-  font: 600 12px/1 var(--mono);
-  letter-spacing: 0.08em;
+  font: 500 12px/1 var(--mono);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -417,41 +385,28 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   display: flex;
   align-items: baseline;
   gap: var(--space-1);
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-faint);
 }
 .cannot-list code {
   background: none;
+  border: none;
+  padding: 0;
   color: var(--text-faint);
   text-decoration: line-through;
   text-decoration-color: var(--danger);
 }
-.cannot-mark { color: var(--danger); font-weight: 700; }
-/* If a forbidden tool ever appeared, make it scream. */
+.cannot-mark { color: var(--danger); font-weight: 600; }
 .cannot-list li[data-present="true"] code { color: var(--danger); text-decoration: none; }
-.cannot-note {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text-faint);
-  max-width: 64ch;
-}
-
-.capability .calls {
-  grid-column: 1 / -1;
-  font: 12px var(--mono);
-  color: var(--text-faint);
-}
-
-.capability[data-expiring="true"] { border-left-color: var(--warn); }
+.cannot-note { margin: 0; font-size: 12px; color: var(--text-faint); max-width: 66ch; }
 
 /* ------------------------------------------------------------------ *
- * Pending consent requests
+ * Pending consent request
  * ------------------------------------------------------------------ */
 
 .panel-pending {
-  border-color: var(--live);
-  border-left: 3px solid var(--live);
-  background: #eef2f8;
+  border-color: var(--accent-dim);
+  background: linear-gradient(180deg, var(--accent-wash), var(--surface));
 }
 
 .request {
@@ -463,45 +418,66 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   border-radius: var(--radius-sm);
 }
 .request + .request { margin-top: var(--space-3); }
-
-.request-title { margin: 0; font-weight: 600; }
-.request-reason { margin: 0; color: var(--text); }
-.request-reason q { font-style: italic; }
+.request-title { margin: 0; font-weight: 600; color: var(--paper); }
+.request-reason { margin: 0; color: var(--mist); }
+.request-reason q { font-style: italic; color: var(--bone); }
 .quiet { color: var(--text-faint); }
-
-.request-discloses {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-/* Provenance marker: the reason line is agent-authored untrusted content
-   (untrustedContentHint), flagged so the person grants on the claim, not the
-   wording. Reads like a caution stamp on the paper. */
-.request-untrusted {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text-faint);
-}
+.request-untrusted { margin: 0; font-size: 12.5px; color: var(--text-faint); }
 .untrusted-badge {
-  font: 600 10.5px/1 var(--mono);
-  letter-spacing: 0.07em;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--warn);
-  border: 1px solid var(--warn);
+  border: 1px solid var(--accent-dim);
   border-radius: var(--radius-sm);
   padding: 2px 5px;
   margin-right: 4px;
 }
-
+.request-discloses { margin: 0; font-size: 13px; color: var(--text-dim); letter-spacing: 0; }
 .request-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ------------------------------------------------------------------ *
+ * Buttons
+ * ------------------------------------------------------------------ */
+
+button {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-raised);
+  color: var(--mist);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out), color 140ms var(--ease-out), transform 120ms var(--ease-out);
+}
+button:hover:not(:disabled) { background: #1c1e20; border-color: var(--ash); }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Grant is the action: it wears the accent as a solid flashlight. */
+button[data-variant="grant"]:not(:disabled) {
+  background: var(--accent);
+  color: var(--void);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+button[data-variant="grant"]:hover:not(:disabled) { background: #f2c633; border-color: #f2c633; }
+
+button[data-variant="revoke"]:not(:disabled) { color: var(--danger); border-color: #4a2a2a; }
+button[data-variant="revoke"]:hover:not(:disabled) { background: #241a1a; border-color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) { button { transition: none; } }
 
 /* ------------------------------------------------------------------ *
  * Claims
  * ------------------------------------------------------------------ */
 
 .claims { display: grid; gap: var(--space-2); }
-
 .claim {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -510,17 +486,17 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   padding: var(--space-3) var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--line);
-  border-left: 3px solid transparent;
   border-radius: var(--radius-sm);
 }
-
-.claim[data-granted="true"] { border-left-color: var(--ok); }
-.claim-write[data-granted="true"] { border-left-color: var(--warn); }
-
+/* Granted state: a subtle surface lift, not a colored rail. */
+.claim[data-granted="true"] {
+  background: linear-gradient(180deg, var(--accent-wash), var(--surface-raised));
+  border-color: var(--accent-dim);
+}
 .claim-meta { display: grid; gap: var(--space-1); }
-.claim-label { margin: 0; font-weight: 600; font-size: 14.5px; }
-.claim-discloses { margin: 0; font-size: 13px; color: var(--text-faint); max-width: 62ch; }
-.claim-expiry { margin: 0; font: 12px var(--mono); color: var(--ok); }
+.claim-label { margin: 0; font-weight: 500; font-size: 14px; color: var(--bone); }
+.claim-discloses { margin: 0; font-size: 13px; color: var(--text-faint); max-width: 64ch; letter-spacing: 0; }
+.claim-expiry { margin: 0; font: 12px var(--mono); color: var(--accent); }
 
 @media (max-width: 560px) {
   .claim { grid-template-columns: 1fr; }
@@ -528,7 +504,7 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
 }
 
 /* ------------------------------------------------------------------ *
- * Programmes
+ * Programmes / products
  * ------------------------------------------------------------------ */
 
 .programs {
@@ -536,7 +512,6 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
-
 .program {
   display: grid;
   gap: var(--space-2);
@@ -544,13 +519,8 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   padding: var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--line);
-  border-top: 3px solid var(--line-strong);
   border-radius: var(--radius-sm);
 }
-
-.program[data-verdict="eligible"] { border-top-color: var(--ok); }
-.program[data-verdict="ineligible"] { border-top-color: var(--danger); }
-.program[data-verdict="undetermined"] { border-top-color: var(--line-strong); }
 
 .program-head {
   display: flex;
@@ -559,30 +529,22 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   align-items: baseline;
   justify-content: space-between;
 }
-
-.program-name { margin: 0; font-size: 15.5px; font-weight: 600; }
+.program-name { margin: 0; font-size: 15px; font-weight: 510; color: var(--paper); letter-spacing: var(--tracking-tight); }
 .program-value { font: 12px var(--mono); color: var(--text-dim); white-space: nowrap; }
 .program-authority { margin: 0; font-size: 12px; color: var(--text-faint); }
-.program-summary { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.program-summary { margin: 0; font-size: 13px; color: var(--text-dim); letter-spacing: 0; }
 
 .program-verdict {
   margin: var(--space-1) 0 0;
-  font: 600 12px var(--mono);
-  letter-spacing: 0.04em;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .program[data-verdict="eligible"] .program-verdict { color: var(--ok); }
 .program[data-verdict="ineligible"] .program-verdict { color: var(--danger); }
 .program[data-verdict="undetermined"] .program-verdict { color: var(--text-faint); }
 
-.requirements {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: var(--space-1);
-}
-
+.requirements { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
 .requirements li {
   display: grid;
   grid-template-columns: 2ch 1fr;
@@ -591,8 +553,7 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   font-size: 13px;
   color: var(--text-dim);
 }
-
-.requirements .mark { font-family: var(--mono); font-weight: 700; }
+.requirements .mark { font-family: var(--mono); font-weight: 600; }
 .requirements li[data-status="met"] .mark { color: var(--ok); }
 .requirements li[data-status="not_met"] .mark { color: var(--danger); }
 .requirements li[data-status="unverified"] .mark { color: var(--text-faint); }
@@ -603,7 +564,6 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
  * ------------------------------------------------------------------ */
 
 .panel-details { padding: 0; }
-
 .panel-details summary {
   padding: var(--space-4) var(--space-6);
   cursor: pointer;
@@ -621,21 +581,16 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
 }
 .panel-details[open] summary::before { transform: rotate(90deg); }
 .panel-details summary h2 { margin: 0; }
-.panel-details summary:focus-visible { outline: 2px solid var(--live); outline-offset: -2px; }
-
+.panel-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .panel-details > .panel-note,
 .panel-details > #profile,
-.panel-details > #env {
-  padding: 0 var(--space-6) var(--space-6);
-}
+.panel-details > #shopper,
+.panel-details > #env { padding: 0 var(--space-6) var(--space-6); }
 .panel-details > .panel-note { padding-bottom: var(--space-4); }
-
-@media (prefers-reduced-motion: reduce) {
-  .panel-details summary::before { transition: none; }
-}
+@media (prefers-reduced-motion: reduce) { .panel-details summary::before { transition: none; } }
 
 /* ------------------------------------------------------------------ *
- * Profile editor
+ * Profile / shopper editor
  * ------------------------------------------------------------------ */
 
 .fields {
@@ -644,48 +599,67 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   margin-bottom: var(--space-4);
 }
-
 .field { display: grid; gap: var(--space-1); align-content: start; }
-
-.field-inline {
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: var(--space-2);
-}
-
+.field-inline { grid-template-columns: auto 1fr; align-items: center; gap: var(--space-2); }
 .field-label { font-size: 13px; color: var(--text-dim); }
 .field-hint { margin: 0; font-size: 12px; color: var(--text-faint); }
 
 input[type="number"],
 input[type="date"],
 select {
-  min-height: 44px;
+  min-height: 40px;
   padding: var(--space-2) var(--space-3);
-  background: var(--surface-raised);
-  color: var(--text);
+  background: var(--void);
+  color: var(--bone);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   font: inherit;
   font-size: 14px;
 }
-
-input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--live);
-}
-
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 input:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--live);
-  outline-offset: 1px;
-}
-
+select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .reset { font-size: 13px; }
 
 /* ------------------------------------------------------------------ *
  * Disclosure log
  * ------------------------------------------------------------------ */
 
+.audit {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.audit:empty::after { content: "Nothing disclosed yet."; color: var(--text-faint); font-style: italic; }
+.audit li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  font: 12px var(--mono);
+  color: var(--text-dim);
+}
+.audit time { color: var(--text-faint); flex: none; }
+.audit .tag { flex: none; min-width: 9ch; }
 .audit .entry-detail { overflow-wrap: anywhere; }
-.audit li[data-type="called"] .tag { color: var(--live); }
+.audit li[data-type="granted"] .tag { color: var(--ok); }
+.audit li[data-type="revoked"] .tag { color: var(--warn); }
+.audit li[data-type="denied"] .tag { color: var(--danger); }
+.audit li[data-type="requested"] .tag { color: var(--accent); }
+.audit li[data-type="called"] .tag { color: var(--accent); }
+
+/* ------------------------------------------------------------------ *
+ * Footer
+ * ------------------------------------------------------------------ */
+
+.footer {
+  margin-top: var(--space-12);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+.footer p { margin: 0; }
