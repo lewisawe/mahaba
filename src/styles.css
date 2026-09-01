@@ -161,13 +161,29 @@ code {
 
 .capability[data-persistent="true"] { border-left-color: var(--line-strong); }
 
+/* Time-boxed grants shift colour as they approach expiry, so the console
+   visibly counts down without anyone touching the page. */
+.capability[data-expiring="true"][data-urgency="soon"] { border-left-color: var(--warn); }
+.capability[data-expiring="true"][data-urgency="imminent"] {
+  border-left-color: var(--danger);
+  animation: mount 200ms ease-out, pulse 900ms ease-in-out infinite;
+}
+.capability[data-urgency="soon"] .expiry { color: var(--warn); }
+.capability[data-urgency="imminent"] .expiry { color: var(--danger); font-weight: 600; }
+
 @keyframes mount {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: none; }
 }
 
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.18); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .capability { animation: none; }
+  .capability[data-expiring="true"][data-urgency="imminent"] { animation: none; }
 }
 
 .capability .name {

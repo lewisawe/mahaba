@@ -37,8 +37,13 @@ function capabilityRow(capability: CapabilityState): HTMLElement {
     el('span', { class: 'desc', text: capability.description }),
   ];
 
+  // Urgency ramps in the final stretch so expiry reads on screen without
+  // anyone touching the page. The gate re-renders once a second while anything
+  // is expiring, so this stays live.
+  let urgency: 'calm' | 'soon' | 'imminent' = 'calm';
   if (capability.expiresAt !== null) {
     const seconds = secondsUntil(capability.expiresAt);
+    urgency = seconds <= 5 ? 'imminent' : seconds <= 15 ? 'soon' : 'calm';
     children.push(
       el('span', {
         class: 'expiry',
@@ -63,6 +68,7 @@ function capabilityRow(capability: CapabilityState): HTMLElement {
       data: {
         persistent: String(capability.persistent),
         expiring: String(capability.expiresAt !== null),
+        urgency,
       },
     },
     children,
