@@ -11,10 +11,11 @@ Built for [The WebMCP Challenge](https://webmcp.devpost.com/).
 
 **Live: [mahabari.netlify.app](https://mahabari.netlify.app/)**
 
-Open it in the ChatGPT in-app browser, or in Chrome 149+ with
-`chrome://flags/#enable-webmcp-testing` enabled.
+Open it in the ChatGPT desktop app's built-in browser (site tools), or in
+Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
 
-> Status: in development. Synthetic demo data only, held in the browser.
+> Synthetic demo data only, held in the browser. Not affiliated with any
+> benefits authority and not a source of advice.
 
 ---
 
@@ -28,6 +29,9 @@ is withdrawn or expires, and **no tool exists at any point that returns a raw
 personal value**. There is no `get_income`, no `get_address`, no
 `get_date_of_birth`. An agent can learn that income is below £30,000. It has no
 way to learn what the income is, because the capability to ask does not exist.
+The interface makes that absence inspectable: it checks those raw-value tool
+names against the browser's own `getTools()` and shows they are not there, so the
+guarantee is demonstrated from ground truth rather than asserted.
 
 This addresses a named risk in the WebMCP specification. Section 6.3.3,
 ["Privacy Leakage Through Over-Parameterization"](https://webmachinelearning.github.io/webmcp/#privacy-leakage-over-parameterization),
@@ -70,6 +74,7 @@ gate.revoke('check_income_threshold');                 // gone from the registry
 | Persistent capabilities | Registered at `start()`, refuse `grant()`, for tools that disclose nothing alone. |
 | Mandatory validation | `validate` is a required field, because Chrome does not enforce `inputSchema`. |
 | Structured errors | Tools return `{ ok, result }` or `{ ok, error }` rather than throwing. |
+| Trust annotations | Every claim is `readOnlyHint: true`; the write is not; `request_consent` is `untrustedContentHint: true` because the reason it surfaces is agent-authored. |
 | Disclosure log | Append-only record of grants, calls, revocations and denials. |
 | Live subscription | `subscribe()` for UI, `liveToolNames()` for browser ground truth. |
 
@@ -101,7 +106,8 @@ npm run dev
 ```
 
 Then enable WebMCP in Chrome at `chrome://flags/#enable-webmcp-testing` and open
-the dev server. WebMCP is also available in the ChatGPT in-app browser without a
+the dev server. WebMCP is also available in the ChatGPT desktop app's built-in
+browser without a
 flag.
 
 ```bash

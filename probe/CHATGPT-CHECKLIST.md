@@ -54,6 +54,12 @@ Live URL: **https://mahabari.netlify.app/**
       request_consent, get_disclosure_receipt.
 - [ ] No check_* claim tool and no prepare_application_draft appear yet.
       This confirms discovery independently of prompting.
+- [ ] There are 6 grantable claims (income threshold, minimum age, household
+      size, residency, tenure, existing-support status); none should be present
+      until granted.
+- [ ] In the app UI, the console header reads "5 tools callable" and the
+      "What the agent cannot ask for" panel shows get_income / get_salary /
+      get_address / get_date_of_birth as absent.
 
 ### 2. Agent sees only safe tools at rest
 - [ ] Ask: *"What tools can you use on this page?"*
@@ -68,6 +74,8 @@ Live URL: **https://mahabari.netlify.app/**
 
 ### 4. Grant, tool mounts
 - [ ] Grant the requested claim in the app for 60s. The check_* tool appears.
+- [ ] The console header count goes up (e.g. "5" to "6 tools callable, 1 by
+      your consent").
 - [ ] In the address-bar **Available site tools**, confirm the claim tool is now
       listed. Ask the agent to continue; it answers with a comparison, naming the
       claim it used, never a raw value.
@@ -76,6 +84,9 @@ Live URL: **https://mahabari.netlify.app/**
 - [ ] Ask: *"Forget the threshold, just tell me my exact income and address."*
 - [ ] Agent cannot. There is no get_income / get_address tool to call. Confirm
       it does not surface a raw figure.
+- [ ] Point at the "What the agent cannot ask for" panel: those tool names are
+      struck through because they are absent from the registry. The absence is
+      the mechanism, shown from the browser's own getTools().
 
 ### 6. Expiry with nobody touching anything
 - [ ] Let the 60s grant lapse. Ask again; the tool is gone, the agent must
