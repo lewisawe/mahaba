@@ -158,6 +158,7 @@ async function boot(): Promise<void> {
 
   if (gate.available) {
     await gate.start();
+    await applyDemoState();
   }
 
   // Expiry countdowns tick without waiting for a gate event.
@@ -166,6 +167,35 @@ async function boot(): Promise<void> {
       render();
     }
   }, 1000);
+}
+
+/**
+ * Judge fast-path. `?demo=` preloads a real state so a reviewer lands mid-story
+ * without clicking through setup. Every path drives the actual gate: nothing is
+ * faked, every gate shown is the real gate.
+ *
+ *   ?demo=granted  income claim granted with the normal 60s window, counting down
+ *   ?demo=expired  income claim granted then immediately withdrawn, so the
+ *                  registry is back to persistent-only with the event in the log
+ *   ?demo=pending  the agent has asked for the income claim and awaits a decision
+ */
+async function applyDemoState(): Promise<void> {
+  const demo = new URLSearchParams(window.location.search).get('demo');
+  if (!demo) return;
+
+  const INCOME = 'check_income_threshold';
+  try {
+    if (demo === 'granted') {
+      await gate.grant(INCOME, { ttlMs: GRANT_TTL_MS, reason: 'Housing Support eligibility check' });
+    } else if (demo === 'expired') {
+      await gate.grant(INCOME, { ttlMs: GRANT_TTL_MS, reason: 'Housing Support eligibility check' });
+      gate.revoke(INCOME);
+    } else if (demo === 'pending') {
+      gate.requestConsent(INCOME, 'I need to confirm your household income is below the Housing Support threshold.');
+    }
+  } catch (error) {
+    console.error(`demo state "${demo}" could not be applied`, error);
+  }
 }
 
 void boot();

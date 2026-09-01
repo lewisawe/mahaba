@@ -3,31 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Proof, Not Profile</title>
-<meta name="description" content="A WebMCP eligibility wallet where the agent's tool registry is gated on revocable user consent.">
+<title>Proof, Not Profile — Pharmacy checkout</title>
+<meta name="description" content="A second WebMCP instance on the same capability-gate: an age- and prescription-gated pharmacy checkout that verifies claims without reading the shopper's data.">
 <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header class="masthead">
-  <p class="eyebrow">Proof, Not Profile</p>
-  <h1>The agent gets answers, not your data.</h1>
+  <p class="eyebrow">Proof, Not Profile · second instance</p>
+  <h1>The pharmacy checks you qualify, not who you are.</h1>
   <p class="lede">
-    Eligibility forms ask for an exact salary when the decision only needs to know
-    whether income is below a threshold. This wallet answers the question without
-    exposing the number, and the tools an agent can call exist only while you
-    permit them.
-  </p>
-  <p class="lede-aside">
-    Built on <code>capability-gate</code>, a reusable primitive. See the same gate
-    in a different domain: the <a href="/pharmacy.html">pharmacy checkout</a>.
+    The same <code>capability-gate</code> primitive as the
+    <a href="/">benefits wallet</a>, a different domain. A restricted-medicine
+    checkout verifies that a buyer clears an age limit and has no conflicting
+    condition, without ever reading the date of birth or the medical history.
+    The claims compare; they never reveal.
   </p>
 </header>
 
 <main id="main">
 
-  <!-- Hero: what the agent can do right now -->
   <section class="panel panel-console" aria-labelledby="console-heading">
     <div class="panel-head">
       <div class="console-headline">
@@ -43,7 +39,6 @@
     <div class="cannot" id="cannot" aria-live="polite"></div>
   </section>
 
-  <!-- Raised by the agent through request_consent -->
   <section class="panel panel-pending" id="pending-panel" aria-labelledby="pending-heading" hidden>
     <div class="panel-head">
       <h2 id="pending-heading">The agent is asking permission</h2>
@@ -51,26 +46,15 @@
     <div id="pending" aria-live="polite"></div>
   </section>
 
-  <section class="panel" aria-labelledby="claims-heading">
+  <section class="panel" aria-labelledby="products-heading">
     <div class="panel-head">
-      <h2 id="claims-heading">What you permit</h2>
+      <h2 id="products-heading">Restricted products</h2>
       <p class="panel-note">
-        Each row is one claim. Permitting it registers a single tool that answers
-        one comparison and returns nothing else.
-      </p>
-    </div>
-    <div id="claims" class="claims"></div>
-  </section>
-
-  <section class="panel" aria-labelledby="programs-heading">
-    <div class="panel-head">
-      <h2 id="programs-heading">Programmes</h2>
-      <p class="panel-note">
-        A requirement stays unresolved until the claim answering it is permitted.
+        A gate stays unresolved until the claim answering it is permitted.
         Nothing is inferred from data the agent has not been allowed to test.
       </p>
     </div>
-    <div id="programs" class="programs"></div>
+    <div id="products" class="programs"></div>
   </section>
 
   <section class="panel" aria-labelledby="audit-heading">
@@ -88,18 +72,16 @@
     <summary><h2>Your details</h2></summary>
     <p class="panel-note">
       Synthetic data, held in this browser only. No tool returns any field from
-      it. Change anything and the programme verdicts follow.
+      it. Change anything and the product verdicts follow.
     </p>
-    <div id="profile"></div>
+    <div id="shopper"></div>
   </details>
 
   <details class="panel panel-details">
     <summary><h2>Environment</h2></summary>
     <p class="panel-note">
       WebMCP needs an origin-isolated, secure document. If
-      <code>originAgentCluster</code> is false, the
-      <code>Origin-Agent-Cluster</code> header is not arriving and no tool can be
-      registered.
+      <code>originAgentCluster</code> is false, no tool can be registered.
     </p>
     <dl class="env" id="env"></dl>
   </details>
@@ -108,11 +90,12 @@
 
 <footer class="footer">
   <p>
-    Built for the WebMCP Challenge. Synthetic demo data only. Not affiliated with
-    any benefits authority and not a source of advice.
+    Second instance for the WebMCP Challenge, on the same
+    <code>capability-gate</code> as the <a href="/">benefits wallet</a>.
+    Synthetic demo data only. Not medical, pharmacy, or benefits advice.
   </p>
 </footer>
 
-<script type="module" src="/src/main.ts"></script>
+<script type="module" src="/src/pharmacy-main.ts"></script>
 </body>
 </html>

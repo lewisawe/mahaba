@@ -1,0 +1,53 @@
+[
+  {
+    "name": "List programmes",
+    "messages": [
+      { "role": "user", "type": "message", "content": "What programmes can this wallet check?" }
+    ],
+    "expectedCall": [
+      { "functionName": "list_programs", "arguments": {} }
+    ]
+  },
+  {
+    "name": "Read a programme's requirements",
+    "messages": [
+      { "role": "user", "type": "message", "content": "What does Housing Support require?" }
+    ],
+    "expectedCall": [
+      { "functionName": "get_program_requirements", "arguments": { "programId": "housing-support" } }
+    ]
+  },
+  {
+    "name": "Report current consent state",
+    "messages": [
+      { "role": "user", "type": "message", "content": "Which claims am I allowed to check right now?" }
+    ],
+    "expectedCall": [
+      { "functionName": "get_consent_state", "arguments": {} }
+    ]
+  },
+  {
+    "name": "Negotiate: ask the person for a claim",
+    "messages": [
+      { "role": "user", "type": "message", "content": "Ask permission to check my income against the threshold." }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "request_consent",
+        "arguments": {
+          "claim": "income_threshold",
+          "reason": { "$contains": "income" }
+        }
+      }
+    ]
+  },
+  {
+    "name": "Return the disclosure receipt",
+    "messages": [
+      { "role": "user", "type": "message", "content": "What has been disclosed so far?" }
+    ],
+    "expectedCall": [
+      { "functionName": "get_disclosure_receipt", "arguments": {} }
+    ]
+  }
+]

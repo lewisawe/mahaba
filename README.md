@@ -131,6 +131,35 @@ log, and the property everything depends on: that a revoked tool cannot be
 executed even by a caller holding a `RegisteredTool` handle obtained while the
 grant was live.
 
+### Official WebMCP evals
+
+The app also passes Google Chrome Labs' own
+[`webmcp-evals`](https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-evals)
+harness, the first-party tooling the WebMCP team ships. Its `smoke` mode runs
+concrete tool calls against the live page over Puppeteer, no LLM, deterministic.
+All 5 persistent tools pass end to end (`list_programs`,
+`get_program_requirements`, `get_consent_state`, `request_consent`,
+`get_disclosure_receipt`). See [`probe/webmcp-evals/`](probe/webmcp-evals/) for
+the suite and how to reproduce.
+
+## A second instance, same primitive
+
+`capability-gate` is not specific to benefits. The
+[pharmacy checkout](pharmacy.html) is a second app on the exact same gate,
+console, and consent loop, with a different claim set: it verifies a buyer clears
+an age limit and has no conflicting condition before selling a restricted
+medicine, without reading the date of birth or the medical history. Only the
+domain changes; the primitive does not.
+
+## Try it fast
+
+Query-param fast-paths preload real state (through the real gate, nothing faked)
+so you can land mid-flow:
+
+- [`/?demo=granted`](https://mahabari.netlify.app/?demo=granted) — income claim granted, counting down
+- [`/?demo=pending`](https://mahabari.netlify.app/?demo=pending) — the agent has asked for a claim
+- [`/?demo=expired`](https://mahabari.netlify.app/?demo=expired) — a grant that has just lapsed
+
 ## Platform research
 
 [`probe/FINDINGS.md`](probe/FINDINGS.md) documents WebMCP behaviour verified

@@ -19,5 +19,14 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rollupOptions: {
+      // The benefits wallet (default) and the pharmacy second instance, which
+      // proves capability-gate generalises across domains. Paths are resolved
+      // relative to the Vite project root.
+      input: {
+        main: 'index.html',
+        pharmacy: 'pharmacy.html',
+      },
+    },
   },
 });
