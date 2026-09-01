@@ -1,20 +1,34 @@
+/**
+ * Proof, Not Profile — "paper ledger" theme.
+ *
+ * The interface reads like an official form and a disclosure receipt, because
+ * that is what the product is: a record of exactly what was asked and answered.
+ * Warm paper canvas, ink text, hairline rules, one official-blue accent for
+ * live/interactive state, a stamp red for withdrawal and danger, a document
+ * green for verified. Flat surfaces, no glow, elevation from contrast and rule
+ * weight rather than shadow.
+ */
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --bg: #0a0c0f;
-  --surface: #13171c;
-  --surface-raised: #1a1f26;
-  --line: #262d36;
-  --line-strong: #36404c;
+  /* Paper and ink */
+  --bg: #f4f1ea;           /* warm paper canvas */
+  --surface: #fbfaf6;      /* card stock, slightly lighter than the page */
+  --surface-raised: #ffffff; /* the whitest surface: rows, inputs, receipts */
+  --line: #d9d3c5;         /* hairline rule on paper */
+  --line-strong: #b7ae99;  /* heavier rule, ledger divider */
 
-  --text: #e8ecf1;
-  --text-dim: #909aa8;
-  --text-faint: #5f6a78;
+  --text: #1b1a17;         /* near-black ink */
+  --text-dim: #55514a;     /* secondary ink */
+  --text-faint: #8a8477;   /* faint pencil */
 
-  --live: #58a6ff;
-  --ok: #3fb950;
-  --warn: #d29922;
-  --danger: #f85149;
+  /* Signal colours. One accent (official blue) carries interactivity and live
+     state. The rest are reserved for meaning: granted/met, withdrawn, warning. */
+  --live: #1b4fa0;         /* official form blue: accents, focus, live capability */
+  --ok: #1f7a3d;           /* document green: granted, requirement met */
+  --warn: #9a6a12;         /* amber ink: approaching expiry, write-consent */
+  --danger: #a5311f;       /* stamp red: withdrawal, denial, not met */
 
   --space-1: 4px;
   --space-2: 8px;
@@ -24,8 +38,9 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  --radius: 10px;
-  --radius-sm: 6px;
+  /* Documents have square-ish corners. Keep radius small and restrained. */
+  --radius: 4px;
+  --radius-sm: 3px;
 
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -66,22 +81,28 @@ main,
   margin-inline: auto;
 }
 
-.masthead { margin-bottom: var(--space-8); }
+/* The masthead reads like the header of an official document: a ruled line
+   under an eyebrow label, then the title. */
+.masthead {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 2px solid var(--text);
+}
 
 .eyebrow {
   margin: 0 0 var(--space-2);
   font: 600 12px/1 var(--mono);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--live);
 }
 
 h1 {
   margin: 0 0 var(--space-3);
-  font-size: clamp(24px, 4vw, 34px);
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  font-size: clamp(26px, 4.4vw, 38px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
@@ -103,7 +124,7 @@ main { display: grid; gap: var(--space-6); }
 .panel h2 {
   margin: 0 0 var(--space-2);
   font: 600 12px/1 var(--mono);
-  letter-spacing: 0.09em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -118,6 +139,9 @@ main { display: grid; gap: var(--space-6); }
 code {
   font: 0.92em var(--mono);
   color: var(--text-dim);
+  background: #ece7db;
+  padding: 0.05em 0.35em;
+  border-radius: var(--radius-sm);
 }
 
 /* Environment table */
@@ -154,7 +178,7 @@ code {
   padding: var(--space-3) var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--line);
-  border-left: 2px solid var(--live);
+  border-left: 3px solid var(--live);
   border-radius: var(--radius-sm);
   animation: mount 200ms ease-out;
 }
@@ -177,8 +201,8 @@ code {
 }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
-  50% { box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.18); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(165, 49, 31, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(165, 49, 31, 0.15); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -233,11 +257,23 @@ button {
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;
 }
-button:hover:not(:disabled) { background: #212933; }
+button:hover:not(:disabled) { background: #efeadd; }
 button:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-button[data-variant="revoke"]:not(:disabled) { border-color: #5c2b28; }
-button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
+
+/* The grant action is the affirmative one: give it the official blue. */
+button[data-variant="grant"]:not(:disabled) {
+  border-color: var(--live);
+  color: var(--live);
+  font-weight: 600;
+}
+button[data-variant="grant"]:hover:not(:disabled) { background: #e7edf6; }
+
+button[data-variant="revoke"]:not(:disabled) {
+  border-color: #d6b7af;
+  color: var(--danger);
+}
+button[data-variant="revoke"]:hover:not(:disabled) { background: #f4e5e1; }
 
 @media (prefers-reduced-motion: reduce) {
   button { transition: none; }
@@ -272,7 +308,7 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
 .audit time { color: var(--text-faint); flex: none; }
 .audit .tag { flex: none; min-width: 9ch; }
 .audit li[data-type="granted"] .tag { color: var(--ok); }
-.audit li[data-type="revoked"] .tag { color: var(--warn); }
+.audit li[data-type="revoked"] .tag { color: var(--danger); }
 .audit li[data-type="denied"] .tag { color: var(--danger); }
 .audit li[data-type="requested"] .tag { color: var(--live); }
 
@@ -313,10 +349,12 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
   border: 0;
 }
 
-/* The console is the hero, so it gets more presence than the other panels. */
+/* The console is the hero. On paper it earns presence through a heavier rule
+   and a faint tinted ground, not a glow. */
 .panel-console {
   border-color: var(--line-strong);
-  background: linear-gradient(180deg, #161b21, var(--surface));
+  border-top: 3px solid var(--live);
+  background: var(--surface-raised);
 }
 
 .capability .calls {
@@ -332,8 +370,9 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
  * ------------------------------------------------------------------ */
 
 .panel-pending {
-  border-color: #2f4a6b;
-  background: linear-gradient(180deg, #141d29, var(--surface));
+  border-color: var(--live);
+  border-left: 3px solid var(--live);
+  background: #eef2f8;
 }
 
 .request {
@@ -373,7 +412,7 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
   padding: var(--space-3) var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--line);
-  border-left: 2px solid transparent;
+  border-left: 3px solid transparent;
   border-radius: var(--radius-sm);
 }
 
@@ -407,7 +446,7 @@ button[data-variant="revoke"]:hover:not(:disabled) { background: #2a1d1d; }
   padding: var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--line);
-  border-top: 2px solid var(--line-strong);
+  border-top: 3px solid var(--line-strong);
   border-radius: var(--radius-sm);
 }
 
@@ -524,7 +563,7 @@ input[type="date"],
 select {
   min-height: 44px;
   padding: var(--space-2) var(--space-3);
-  background: var(--bg);
+  background: var(--surface-raised);
   color: var(--text);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
