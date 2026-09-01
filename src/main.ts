@@ -18,8 +18,10 @@ import {
 import { mount } from './ui/dom';
 import {
   GRANT_TTL_MS,
+  renderCannot,
   renderClaimControls,
   renderConsole,
+  renderConsoleCount,
   renderPending,
   type ConsentActions,
 } from './ui/consent';
@@ -40,6 +42,8 @@ const getProfile = (): Profile => profile;
 
 const hosts = {
   console: mount('console'),
+  toolCount: mount('tool-count'),
+  cannot: mount('cannot'),
   pending: mount('pending'),
   pendingPanel: mount('pending-panel'),
   claims: mount('claims'),
@@ -67,11 +71,16 @@ function render(): void {
   const snapshot = gate.snapshot();
 
   renderConsole(hosts.console, snapshot);
+  renderConsoleCount(hosts.toolCount, snapshot);
   renderPending(hosts.pending, snapshot, consentActions);
   if (hosts.pendingPanel) hosts.pendingPanel.hidden = snapshot.pending.length === 0;
   renderClaimControls(hosts.claims, snapshot, consentActions);
   renderPrograms(hosts.programs, profile, (tool) => gate.isGranted(tool));
   renderAudit(hosts.audit, gate.audit());
+
+  // The "cannot do" surface reads the browser's real registry (ground truth,
+  // not our bookkeeping), so refresh it whenever state changes.
+  void gate.liveToolNames().then((names) => renderCannot(hosts.cannot, names));
 }
 
 function renderProfileEditor(): void {

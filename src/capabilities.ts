@@ -157,8 +157,10 @@ export function registerCapabilities({ gate, getProfile }: RegisterOptions): voi
       required: ['claim', 'reason'],
       additionalProperties: false,
     },
-    // Not read-only: it changes what the person is being asked to decide.
-    annotations: { readOnlyHint: false },
+    // Not read-only: it changes what the person is being asked to decide. The
+    // reason string is authored by the agent and surfaced verbatim to the
+    // person, so it is untrusted content crossing the agent->human boundary.
+    annotations: { readOnlyHint: false, untrustedContentHint: true },
     persistent: true,
     validate: (raw) => ({
       claim: requireString(raw, 'claim'),

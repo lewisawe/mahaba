@@ -97,6 +97,11 @@ export const PROGRAMS: Program[] = [
         args: { acceptedTenures: ['renting', 'temporary'] },
         label: 'Not an owner-occupier',
       },
+      {
+        claim: 'support_status',
+        args: { mustBeReceiving: false },
+        label: 'Not already receiving means-tested support',
+      },
     ],
   },
   {

@@ -78,6 +78,8 @@ export interface CapabilityState {
   granted: boolean;
   persistent: boolean;
   readOnly: boolean;
+  /** True when the tool carries agent-authored or cross-boundary content. */
+  untrustedContent: boolean;
   /** Epoch ms, or null for an open or absent grant. */
   expiresAt: number | null;
   reason: string | null;
@@ -262,6 +264,7 @@ export class CapabilityGate {
         granted: Boolean(entry.controller),
         persistent: Boolean(entry.def.persistent),
         readOnly: entry.def.annotations?.readOnlyHint === true,
+        untrustedContent: entry.def.annotations?.untrustedContentHint === true,
         expiresAt: entry.expiresAt,
         reason: entry.reason,
         callCount: entry.callCount,

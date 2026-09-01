@@ -26,13 +26,17 @@
   <!-- Hero: what the agent can do right now -->
   <section class="panel panel-console" aria-labelledby="console-heading">
     <div class="panel-head">
-      <h2 id="console-heading">Agent capabilities</h2>
+      <div class="console-headline">
+        <h2 id="console-heading">Agent capabilities</h2>
+        <p class="tool-count" id="tool-count" aria-live="polite"></p>
+      </div>
       <p class="panel-note">
         Read from the browser's own tool registry. A withdrawn capability is not
         disabled, it stops existing.
       </p>
     </div>
     <div id="console" class="capabilities" aria-live="polite"></div>
+    <div class="cannot" id="cannot" aria-live="polite"></div>
   </section>
 
   <!-- Raised by the agent through request_consent -->

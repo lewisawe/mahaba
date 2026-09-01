@@ -83,6 +83,68 @@ export function renderConsole(host: HTMLElement | null, snapshot: GateSnapshot):
   replaceChildren(host, ...granted.map(capabilityRow));
 }
 
+/**
+ * Live count of tools the agent can currently call. Rendered from the gate
+ * snapshot so it moves the instant a grant or revocation changes the registry.
+ * This is the number that dramatizes the whole thesis: the registry is state.
+ */
+export function renderConsoleCount(host: HTMLElement | null, snapshot: GateSnapshot): void {
+  if (!host) return;
+  const granted = snapshot.capabilities.filter((c) => c.granted).length;
+  const consented = snapshot.capabilities.filter((c) => c.granted && !c.persistent).length;
+  replaceChildren(
+    host,
+    el('span', { class: 'tool-count-n', text: String(granted) }),
+    el('span', {
+      text:
+        granted === 1
+          ? ' tool callable'
+          : ` tools callable${consented > 0 ? `, ${consented} by your consent` : ''}`,
+    }),
+  );
+}
+
+/**
+ * The inspectable proof of the adversarial beat. Rather than assert "the agent
+ * can't get your income", check a set of raw-value tool names against the
+ * browser's own live registry and show that none of them exist. The absence is
+ * demonstrated from ground truth, not claimed.
+ */
+const FORBIDDEN_RAW_TOOLS = [
+  'get_income',
+  'get_salary',
+  'get_address',
+  'get_date_of_birth',
+] as const;
+
+export function renderCannot(host: HTMLElement | null, liveToolNames: string[]): void {
+  if (!host) return;
+  const present = FORBIDDEN_RAW_TOOLS.filter((name) => liveToolNames.includes(name));
+
+  replaceChildren(
+    host,
+    el('p', { class: 'cannot-head', text: 'What the agent cannot ask for' }),
+    el(
+      'ul',
+      { class: 'cannot-list' },
+      FORBIDDEN_RAW_TOOLS.map((name) =>
+        el('li', { data: { present: String(present.includes(name)) } }, [
+          el('span', { class: 'cannot-mark', attrs: { 'aria-hidden': 'true' }, text: '\u2717' }),
+          el('code', { text: name }),
+          el('span', { class: 'sr-only', text: ' is not registered' }),
+        ]),
+      ),
+    ),
+    el('p', {
+      class: 'cannot-note',
+      text:
+        present.length === 0
+          ? 'None of these tools exist in the registry, so there is nothing for the agent to call. The absence is the mechanism.'
+          : 'A raw-value tool is present. This should never happen.',
+    }),
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Pending consent requests, raised by the agent
  * ------------------------------------------------------------------ */
@@ -111,6 +173,12 @@ export function renderPending(
         el('span', { class: 'quiet', text: 'The agent says: ' }),
         // Agent-authored text. Set as a text node, never parsed as markup.
         el('q', { text: request.reason }),
+      ]),
+      // Flag the provenance: this line is untrusted content authored by the
+      // agent (untrustedContentHint), not a claim the site is making.
+      el('p', { class: 'request-untrusted', attrs: { role: 'note' } }, [
+        el('span', { class: 'untrusted-badge', text: 'agent-authored' }),
+        el('span', { class: 'quiet', text: ' — treat this wording as untrusted; grant on the claim, not the phrasing.' }),
       ]),
       spec ? el('p', { class: 'request-discloses', text: spec.discloses }) : null,
       el('div', { class: 'request-actions' }, [

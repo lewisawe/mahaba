@@ -17,6 +17,7 @@ export const CLAIM_IDS = [
   'household_size',
   'residency',
   'tenure_status',
+  'support_status',
 ] as const;
 
 export type ClaimId = (typeof CLAIM_IDS)[number];
@@ -75,6 +76,14 @@ function requireInteger(raw: unknown, field: string, min: number, max: number): 
   }
   if (value < min || value > max) {
     throw new Error(`"${field}" must be between ${min} and ${max}`);
+  }
+  return value;
+}
+
+function requireBoolean(raw: unknown, field: string): boolean {
+  const value = asRecord(raw)[field];
+  if (typeof value !== 'boolean') {
+    throw new Error(`"${field}" must be a boolean`);
   }
   return value;
 }
@@ -227,6 +236,36 @@ export const CLAIMS: Record<ClaimId, ClaimSpec> = {
       claim: `tenure among ${acceptedTenures.join(', ')}`,
     }),
     summarize: ({ acceptedTenures }) => `tested tenure against ${acceptedTenures.join(', ')}`,
+  }),
+
+  support_status: defineClaim<{ mustBeReceiving: boolean }>({
+    id: 'support_status',
+    label: 'Existing support status matches',
+    discloses:
+      'The agent learns only whether the household already receives means-tested support, matched against the value a programme requires. It learns nothing about which support or how much.',
+    description:
+      "Answer whether this household's existing means-tested support status matches what a programme requires. Pass mustBeReceiving true for programmes that require the household to already receive support, or false for programmes that require it does not. Returns only true or false.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mustBeReceiving: {
+          type: 'boolean',
+          description:
+            'The status the programme requires: true if the household must already receive means-tested support, false if it must not.',
+        },
+      },
+      required: ['mustBeReceiving'],
+      additionalProperties: false,
+    },
+    validate: (raw) => ({ mustBeReceiving: requireBoolean(raw, 'mustBeReceiving') }),
+    answer: (profile, { mustBeReceiving }) => ({
+      satisfied: profile.receivingSupport === mustBeReceiving,
+      claim: mustBeReceiving
+        ? 'already receiving means-tested support'
+        : 'not already receiving means-tested support',
+    }),
+    summarize: ({ mustBeReceiving }) =>
+      `checked support status against required ${mustBeReceiving ? 'receiving' : 'not receiving'}`,
   }),
 };
 
