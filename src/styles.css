@@ -397,6 +397,7 @@ code {
   text-decoration-color: var(--danger);
 }
 .cannot-mark { color: var(--danger); font-weight: 600; }
+.cannot-field { color: var(--text-dim); font-size: 11.5px; }
 .cannot-list li[data-present="true"] code { color: var(--danger); text-decoration: none; }
 .cannot-note { margin: 0; font-size: 12px; color: var(--text-faint); max-width: 66ch; }
 
@@ -649,6 +650,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .audit li[data-type="revoked"] .tag { color: var(--warn); }
 .audit li[data-type="denied"] .tag { color: var(--danger); }
 .audit li[data-type="requested"] .tag { color: var(--accent); }
+.audit li[data-type="declined"] .tag { color: var(--warn); }
 .audit li[data-type="called"] .tag { color: var(--accent); }
 
 /* ------------------------------------------------------------------ *

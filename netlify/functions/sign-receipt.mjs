@@ -1,14 +1,18 @@
 /**
  * sign-receipt
  *
- * Turns a disclosure log into a verifiable receipt. The client posts the
+ * Turns a disclosure log into a signed attestation. The client posts the
  * append-only audit entries (which by construction carry no personal value),
  * and the function returns the same payload plus an HMAC-SHA256 signature over a
  * canonical serialisation of it.
  *
- * The signing key never reaches the browser, so a receipt cannot be forged
- * client-side. The same endpoint verifies a receipt when called with `verify`,
- * which is what makes the receipt evidence rather than decoration.
+ * The signing key never reaches the browser, so the signature attests two
+ * things and no more: that this issuer signed these exact entries (authenticity)
+ * and that they have not been altered since (integrity). A third party cannot
+ * mint a valid receipt, and any later edit breaks verification. It does not
+ * prove the browser reported the log faithfully in the first place; that is the
+ * trust boundary, and the tool description states it plainly rather than
+ * implying the receipt is an independent audit of the session.
  *
  * Privacy invariant enforced here, not assumed: the function rejects any entry
  * whose fields could carry a raw value. It accepts only the known disclosure-log
@@ -22,7 +26,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 // working; production sets RECEIPT_SIGNING_KEY in the site config.
 const KEY = process.env.RECEIPT_SIGNING_KEY ?? 'dev-only-key-not-for-production';
 
-const ALLOWED_TYPES = new Set(['granted', 'revoked', 'called', 'denied', 'requested']);
+const ALLOWED_TYPES = new Set(['granted', 'revoked', 'called', 'denied', 'requested', 'declined']);
 
 // Fields we permit per entry. Anything else is dropped before signing, so a
 // stray value cannot ride along in the receipt.

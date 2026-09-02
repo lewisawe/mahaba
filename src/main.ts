@@ -24,6 +24,7 @@ import {
   renderConsoleCount,
   renderPending,
   type ConsentActions,
+  type ForbiddenGetter,
 } from './ui/consent';
 import { renderAudit, renderEnvironment, renderPrograms, renderProfile } from './ui/views';
 
@@ -67,6 +68,22 @@ const consentActions: ConsentActions = {
   deny: (tool) => gate.denyConsent(tool),
 };
 
+/**
+ * The getter tools an over-parameterized design would have registered to read
+ * each raw field this wallet holds. Derived from the Profile shape, so the
+ * "cannot ask for" proof is tied to the actual data at risk. None of these is
+ * ever defined on the gate; the panel proves their absence from the live
+ * registry.
+ */
+const FORBIDDEN_GETTERS: readonly ForbiddenGetter[] = [
+  { tool: 'get_income', field: 'annual income' },
+  { tool: 'get_date_of_birth', field: 'date of birth' },
+  { tool: 'get_household_size', field: 'household size' },
+  { tool: 'get_district', field: 'district' },
+  { tool: 'get_tenure', field: 'housing tenure' },
+  { tool: 'get_support_status', field: 'support status' },
+];
+
 function render(): void {
   const snapshot = gate.snapshot();
 
@@ -80,7 +97,7 @@ function render(): void {
 
   // The "cannot do" surface reads the browser's real registry (ground truth,
   // not our bookkeeping), so refresh it whenever state changes.
-  void gate.liveToolNames().then((names) => renderCannot(hosts.cannot, names));
+  void gate.liveToolNames().then((names) => renderCannot(hosts.cannot, names, FORBIDDEN_GETTERS));
 }
 
 function renderProfileEditor(): void {

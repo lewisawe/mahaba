@@ -247,6 +247,8 @@ function describe(entry: AuditEntry): string {
       return `${entry.name}: ${entry.message}`;
     case 'requested':
       return `${entry.name} — ${entry.reason}`;
+    case 'declined':
+      return `${entry.name} (declined by you)`;
   }
 }
 

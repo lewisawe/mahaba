@@ -98,7 +98,8 @@ export type AuditEntry =
   | { type: 'revoked'; name: string; at: number; cause: 'user' | 'expiry' | 'teardown' }
   | { type: 'called'; name: string; at: number; summary: string }
   | { type: 'denied'; name: string; at: number; code: ToolErrorCode; message: string }
-  | { type: 'requested'; name: string; at: number; reason: string };
+  | { type: 'requested'; name: string; at: number; reason: string }
+  | { type: 'declined'; name: string; at: number };
 
 export interface GateSnapshot {
   capabilities: CapabilityState[];
@@ -246,9 +247,13 @@ export class CapabilityGate {
     return request;
   }
 
-  /** Dismiss a pending request without granting it. */
+  /** Dismiss a pending request without granting it. Recorded in the audit log. */
   denyConsent(name: string): void {
-    this.#pending.delete(name);
+    // Only log a decline when there was a request to decline, so the log
+    // reflects real decisions and cannot be spammed with phantom entries.
+    if (this.#pending.delete(name)) {
+      this.#log({ type: 'declined', name, at: this.#now() });
+    }
     this.#emit();
   }
 

@@ -29,6 +29,7 @@ import {
   renderConsoleCount,
   renderPending,
   type ConsentActions,
+  type ForbiddenGetter,
 } from './ui/consent';
 import { renderAudit, renderEnvironment } from './ui/views';
 
@@ -102,6 +103,18 @@ function renderProducts(): void {
   replaceChildren(hosts.products, ...PRODUCTS.map(productCard));
 }
 
+/**
+ * Getters an over-parameterized pharmacy would have registered to read the raw
+ * fields it holds about a shopper. Derived from the Shopper shape, so the proof
+ * names the actual data at risk here (date of birth, medical history), which is
+ * a different set from the benefits wallet.
+ */
+const FORBIDDEN_GETTERS: readonly ForbiddenGetter[] = [
+  { tool: 'get_date_of_birth', field: 'date of birth' },
+  { tool: 'get_conditions', field: 'medical conditions' },
+  { tool: 'get_prescription', field: 'prescription details' },
+];
+
 function render(): void {
   const snapshot = gate.snapshot();
   renderConsole(hosts.console, snapshot);
@@ -110,7 +123,7 @@ function render(): void {
   if (hosts.pendingPanel) hosts.pendingPanel.hidden = snapshot.pending.length === 0;
   renderProducts();
   renderAudit(hosts.audit, gate.audit());
-  void gate.liveToolNames().then((names) => renderCannot(hosts.cannot, names));
+  void gate.liveToolNames().then((names) => renderCannot(hosts.cannot, names, FORBIDDEN_GETTERS));
 }
 
 function renderShopperEditor(): void {

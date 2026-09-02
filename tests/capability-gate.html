@@ -248,6 +248,29 @@ async function main() {
     assert(gate.snapshot().pending.length === 0, 'pending request survived the grant');
   });
 
+  await test('declining a request clears it and records it in the audit log', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    gate.requestConsent('check_income_threshold', 'to check Housing Support');
+    assert(gate.snapshot().pending.length === 1, 'request not recorded');
+    gate.denyConsent('check_income_threshold');
+    assert(gate.snapshot().pending.length === 0, 'declined request still pending');
+    const declined = gate.audit().filter((e) => e.type === 'declined');
+    assert(declined.length === 1, 'decline was not recorded in the audit log');
+    assert(declined[0].name === 'check_income_threshold', 'declined entry names the wrong tool');
+    // The tool must not have been registered by a decline.
+    assert(!(await gate.liveToolNames()).includes('check_income_threshold'), 'decline registered the tool');
+    return '(decline is an append-only event, not a silent delete)';
+  });
+
+  await test('declining with no pending request logs nothing', async (gate) => {
+    defineIncomeClaim(gate);
+    await gate.start();
+    gate.denyConsent('check_income_threshold');
+    assert(gate.audit().length === 0, 'a phantom decline was logged with no request pending');
+    return '(no request, no entry)';
+  });
+
   await test('requestConsent refuses when already granted', async (gate) => {
     defineIncomeClaim(gate);
     await gate.start();

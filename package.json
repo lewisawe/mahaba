@@ -10,7 +10,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node probe/run.mjs --url http://localhost:5173/tests/capability-gate.html",
+    "test": "node probe/ci-tests.mjs",
+    "test:gate": "node probe/run.mjs --url http://localhost:5173/tests/capability-gate.html",
     "probe": "node probe/run.mjs index.html"
   },
   "devDependencies": {

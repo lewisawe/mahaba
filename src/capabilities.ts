@@ -184,7 +184,7 @@ export function registerCapabilities({ gate, getProfile }: RegisterOptions): voi
 
   gate.define('get_disclosure_receipt', {
     description:
-      'Return a signed, verifiable record of what has been disclosed in this session: which claims were permitted, compared, denied and withdrawn. Contains no personal values. The signature is produced server-side and can be re-verified.',
+      'Return a signed attestation of this session\u2019s disclosure log: which claims were permitted, compared, denied and withdrawn. Contains no personal values. The wallet reports the log and a server signs it with a key the browser never sees, so the signature attests that this issuer signed exactly these entries and lets anyone re-verify they were not altered afterwards. It does not independently prove the wallet reported the log faithfully.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     persistent: true,
@@ -198,11 +198,16 @@ export function registerCapabilities({ gate, getProfile }: RegisterOptions): voi
             ? entry.summary
             : entry.type === 'denied'
               ? `${entry.name}: ${entry.message}`
-              : entry.name,
+              : entry.type === 'declined'
+                ? `${entry.name} (declined)`
+                : entry.name,
       }));
 
       // Ask the signing function for an HMAC over the entries. The signing key
-      // never reaches the browser, so the receipt cannot be forged client-side.
+      // never reaches the browser, so a third party cannot mint a receipt and
+      // the entries cannot be altered after signing without detection. It does
+      // not prove the browser reported the log faithfully: the guarantee is
+      // integrity and issuer authenticity, not independent audit of the source.
       // If the function is unreachable, still return the entries rather than
       // failing the tool: the record is useful even unsigned, and the agent is
       // told which it got.

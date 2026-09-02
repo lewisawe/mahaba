@@ -114,21 +114,34 @@ export function renderConsoleCount(host: HTMLElement | null, snapshot: GateSnaps
 }
 
 /**
- * The inspectable proof of the adversarial beat. Rather than assert "the agent
- * can't get your income", check a set of raw-value tool names against the
- * browser's own live registry and show that none of them exist. The absence is
- * demonstrated from ground truth, not claimed.
+ * A raw value the wallet holds, and the getter tool an over-parameterized
+ * design would have exposed to read it. The proof is derived from these: for
+ * every sensitive field the app actually stores, show that no tool exists to
+ * return it.
  */
-const FORBIDDEN_RAW_TOOLS = [
-  'get_income',
-  'get_salary',
-  'get_address',
-  'get_date_of_birth',
-] as const;
+export interface ForbiddenGetter {
+  /** The tool name a naive design would register to read this field. */
+  tool: string;
+  /** The field it would expose, named as the person would recognise it. */
+  field: string;
+}
 
-export function renderCannot(host: HTMLElement | null, liveToolNames: string[]): void {
+/**
+ * The inspectable proof of the adversarial beat. Rather than assert "the agent
+ * can't get your income", take the raw fields this wallet holds, and for each
+ * one check the getter tool that would read it against the browser's own live
+ * registry. Showing none of them exist demonstrates the guarantee from ground
+ * truth, and ties it to the real data at risk rather than to a fixed list of
+ * names. Each app passes the getters for the fields it actually stores, so the
+ * same component stays honest across different domains.
+ */
+export function renderCannot(
+  host: HTMLElement | null,
+  liveToolNames: string[],
+  forbidden: readonly ForbiddenGetter[],
+): void {
   if (!host) return;
-  const present = FORBIDDEN_RAW_TOOLS.filter((name) => liveToolNames.includes(name));
+  const present = forbidden.filter((getter) => liveToolNames.includes(getter.tool));
 
   replaceChildren(
     host,
@@ -136,10 +149,11 @@ export function renderCannot(host: HTMLElement | null, liveToolNames: string[]):
     el(
       'ul',
       { class: 'cannot-list' },
-      FORBIDDEN_RAW_TOOLS.map((name) =>
-        el('li', { data: { present: String(present.includes(name)) } }, [
+      forbidden.map((getter) =>
+        el('li', { data: { present: String(present.some((p) => p.tool === getter.tool)) } }, [
           el('span', { class: 'cannot-mark', attrs: { 'aria-hidden': 'true' }, text: '\u2717' }),
-          el('code', { text: name }),
+          el('code', { text: getter.tool }),
+          el('span', { class: 'cannot-field', text: getter.field }),
           el('span', { class: 'sr-only', text: ' is not registered' }),
         ]),
       ),
@@ -148,7 +162,7 @@ export function renderCannot(host: HTMLElement | null, liveToolNames: string[]):
       class: 'cannot-note',
       text:
         present.length === 0
-          ? 'None of these tools exist in the registry, so there is nothing for the agent to call. The absence is the mechanism.'
+          ? 'For every value this wallet holds, the tool that would read it is absent from the registry, so there is nothing for the agent to call. The absence is the mechanism.'
           : 'A raw-value tool is present. This should never happen.',
     }),
   );

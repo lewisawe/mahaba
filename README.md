@@ -29,9 +29,10 @@ is withdrawn or expires, and **no tool exists at any point that returns a raw
 personal value**. There is no `get_income`, no `get_address`, no
 `get_date_of_birth`. An agent can learn that income is below £30,000. It has no
 way to learn what the income is, because the capability to ask does not exist.
-The interface makes that absence inspectable: it checks those raw-value tool
-names against the browser's own `getTools()` and shows they are not there, so the
-guarantee is demonstrated from ground truth rather than asserted.
+The interface makes that absence inspectable: for every raw field the wallet
+holds, it checks the getter tool that would read it against the browser's own
+`getTools()` and shows it is not there, so the guarantee is demonstrated from
+ground truth rather than asserted.
 
 This addresses a named risk in the WebMCP specification. Section 6.3.3,
 ["Privacy Leakage Through Over-Parameterization"](https://webmachinelearning.github.io/webmcp/#privacy-leakage-over-parameterization),
@@ -75,7 +76,7 @@ gate.revoke('check_income_threshold');                 // gone from the registry
 | Mandatory validation | `validate` is a required field, because Chrome does not enforce `inputSchema`. |
 | Structured errors | Tools return `{ ok, result }` or `{ ok, error }` rather than throwing. |
 | Trust annotations | Every claim is `readOnlyHint: true`; the write is not; `request_consent` is `untrustedContentHint: true` because the reason it surfaces is agent-authored. |
-| Disclosure log | Append-only record of grants, calls, revocations and denials. |
+| Disclosure log | Append-only record of grants, calls, revocations, denials, consent requests and declines. |
 | Live subscription | `subscribe()` for UI, `liveToolNames()` for browser ground truth. |
 
 ### Errors are returned, not thrown
@@ -122,14 +123,27 @@ execution round-trips through the browser process and cannot be verified in a
 DOM-only test environment.
 
 ```bash
-npm run dev                                    # in one terminal
-node probe/run.mjs --url http://localhost:5173/tests/capability-gate.html
+npm test            # boots the dev server, runs both suites in Chrome, exits
 ```
 
-17 assertions cover grant, revoke, expiry, validation, double-grant, the audit
-log, and the property everything depends on: that a revoked tool cannot be
-executed even by a caller holding a `RegisteredTool` handle obtained while the
-grant was live.
+`npm test` runs [`probe/ci-tests.mjs`](probe/ci-tests.mjs), which starts the
+Vite dev server (so the `Origin-Agent-Cluster: ?1` header WebMCP requires is
+sent), drives both suites through `probe/run.mjs`, and shuts the server down. To
+run one suite by hand against an already-running server:
+
+```bash
+npm run dev                                    # in one terminal
+node probe/run.mjs --url http://localhost:5173/tests/capability-gate.html
+node probe/run.mjs --url http://localhost:5173/tests/agent-workflow.html
+```
+
+The `capability-gate` suite has 19 assertions covering grant, revoke, expiry,
+validation, double-grant, consent request and decline, the audit log, and the
+property everything depends on: that a revoked tool cannot be executed even by a
+caller holding a `RegisteredTool` handle obtained while the grant was live. The
+`agent-workflow` suite has 19 more against the real registered tools, including a
+sentinel-profile leak test that grants every claim and asserts no raw profile
+value appears in any tool result or in the disclosure receipt.
 
 ### Official WebMCP evals
 

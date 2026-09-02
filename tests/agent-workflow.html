@@ -174,30 +174,69 @@ async function main() {
     return '(default profile qualifies on all 4)';
   });
 
-  await test('no response anywhere contains a raw profile value', async (gate) => {
-    for (const claim of ['income_threshold', 'age_requirement', 'household_size', 'residency', 'tenure_status']) {
+  await test('no response anywhere contains a raw profile value', async (gate, update) => {
+    // Sentinel profile: every raw value is chosen to be unmistakable and
+    // distinct from any argument the checks below pass, so an appearance in
+    // output can only mean the profile value leaked, never a coincidence or an
+    // echoed argument. This is what lets residency be tested rather than skipped.
+    update({
+      annualIncome: 31337,          // distinctive, within [0, 10_000_000]
+      dateOfBirth: '1979-03-29',    // distinctive, not passed anywhere below
+      householdSize: 7,             // within [1, 20]
+      district: 'zzsentineldistrict',
+      tenure: 'temporary',
+      receivingSupport: true,
+    });
+
+    // Grant every claim, including support_status which the previous version
+    // omitted, so the assertion covers the whole claim surface.
+    for (const claim of ['income_threshold', 'age_requirement', 'household_size', 'residency', 'tenure_status', 'support_status']) {
       await gate.grant(toolNameFor(claim), { reason: 'test' });
     }
+
+    // Arguments are deliberately different from the sentinel values above, so
+    // any sentinel that surfaces came from the profile, not from these inputs.
     const responses = [
       await call('check_income_threshold', { threshold: 30000 }),
       await call('check_age_requirement', { minimumAge: 19 }),
       await call('check_household_size', { minimumSize: 3 }),
       await call('check_residency', { districts: ['north', 'east'] }),
       await call('check_tenure_status', { acceptedTenures: ['renting'] }),
+      await call('check_support_status', { mustBeReceiving: false }),
       await call('get_consent_state', {}),
       await call('get_disclosure_receipt', {}),
     ];
+    assert(responses.every((r) => r.ok === true), `a check failed: ${JSON.stringify(responses)}`);
+
     const blob = JSON.stringify(responses);
-    // Values from DEFAULT_PROFILE that must never appear.
-    for (const secret of ['24000', '1991-04-17', 'north']) {
-      // "north" appears legitimately as a caller-supplied argument, so only the
-      // profile-derived leak matters: assert it is never echoed as an answer.
-      if (secret === 'north') continue;
-      assert(!blob.includes(secret), `response leaked ${secret}`);
+    // No raw sentinel value may appear anywhere in any response. These are
+    // chosen to be long/distinctive enough not to collide with timestamps,
+    // counts, or other legitimate substrings in the output.
+    const sentinels = ['31337', '1979-03-29', 'zzsentineldistrict'];
+    for (const secret of sentinels) {
+      assert(!blob.includes(secret), `response leaked the raw profile value ${JSON.stringify(secret)}`);
     }
-    assert(!blob.includes('"annualIncome"'), 'a profile field name leaked');
-    assert(!blob.includes('"dateOfBirth"'), 'a profile field name leaked');
-    return '(no income, no date of birth, no profile fields)';
+    // householdSize (7) and tenure ("temporary") are too short to scan for
+    // safely: a bare "7" collides with timestamps and counts. Assert on their
+    // results structurally instead. Each claim answer must expose only a
+    // boolean and the argument-derived restatement, never the profile value.
+    const household = responses[2].result;
+    assert(typeof household.satisfied === 'boolean', 'household answer missing satisfied');
+    assert(household.claim === 'household of at least 3', `household claim restated the profile value: "${household.claim}"`);
+    const tenure = responses[4].result;
+    // Sentinel tenure is "temporary"; the check accepts only ["renting"], so
+    // the correct answer is not satisfied. The point of the assertion is that
+    // the profile value "temporary" never appears, only the argument-derived
+    // restatement does.
+    assert(tenure.satisfied === false, 'temporary should not satisfy accepted ["renting"]');
+    assert(tenure.claim === 'tenure among renting', `tenure answer restated the profile value: "${tenure.claim}"`);
+    assert(Object.keys(tenure).sort().join(',') === 'claim,satisfied', `tenure answer has extra fields: ${Object.keys(tenure)}`);
+
+    // Nor may any profile field name appear, which would signal the shape leaking.
+    for (const field of ['annualIncome', 'dateOfBirth', 'householdSize', 'district', 'tenure', 'receivingSupport']) {
+      assert(!blob.includes(`"${field}"`), `a profile field name leaked: ${field}`);
+    }
+    return '(6 claims + receipt: no raw value, no field name, residency included)';
   });
 
   await test('an ineligible profile is reported as not met, not hidden', async (gate) => {
