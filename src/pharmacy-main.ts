@@ -191,6 +191,7 @@ async function applyDemoState(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
+  applyUiVariant();
   registerPharmacyCapabilities({ gate, getShopper });
   renderEnvironment(hosts.env, gate.available);
   renderShopperEditor();
@@ -202,6 +203,20 @@ async function boot(): Promise<void> {
   setInterval(() => {
     if (gate.snapshot().capabilities.some((c) => c.expiresAt !== null)) render();
   }, 1000);
+}
+
+/**
+ * UI framing variant. Editorial is the default (data-ui="editorial" in the
+ * markup). `?ui=classic` opts back into the original instrument framing. Framing
+ * only; the capability console and every tool behaviour are identical in both.
+ */
+function applyUiVariant(): void {
+  const ui = new URLSearchParams(window.location.search).get('ui');
+  if (ui === 'classic') {
+    document.documentElement.removeAttribute('data-ui');
+  } else if (ui === 'editorial') {
+    document.documentElement.setAttribute('data-ui', 'editorial');
+  }
 }
 
 void boot();
