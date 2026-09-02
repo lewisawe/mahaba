@@ -17,11 +17,12 @@ import {
   ageFrom,
   PRODUCTS,
   PHARMACY_CLAIMS,
+  PHARMACY_CLAIM_IDS,
   toolNameFor,
   type Shopper,
   type Product,
 } from './domain/pharmacy';
-import { el, mount, replaceChildren } from './ui/dom';
+import { button, el, mount, replaceChildren, secondsUntil } from './ui/dom';
 import {
   GRANT_TTL_MS,
   renderCannot,
@@ -43,6 +44,7 @@ const hosts = {
   cannot: mount('cannot'),
   pending: mount('pending'),
   pendingPanel: mount('pending-panel'),
+  claims: mount('claims'),
   products: mount('products'),
   audit: mount('audit'),
   shopper: mount('shopper'),
@@ -121,9 +123,47 @@ function render(): void {
   renderConsoleCount(hosts.toolCount, snapshot);
   renderPending(hosts.pending, snapshot, consentActions);
   if (hosts.pendingPanel) hosts.pendingPanel.hidden = snapshot.pending.length === 0;
+  renderPharmacyClaims(snapshot);
   renderProducts();
   renderAudit(hosts.audit, gate.audit());
   void gate.liveToolNames().then((names) => renderCannot(hosts.cannot, names, FORBIDDEN_GETTERS));
+}
+
+/**
+ * The "what you permit" controls, one per pharmacy claim. Mirrors the benefits
+ * wallet's consent surface so both instances behave identically: a human can
+ * grant or withdraw each claim directly, not only in response to an agent's
+ * request. Driven by PHARMACY_CLAIMS; the pharmacy has no write/draft tool, so
+ * there is no extra approval-gated row here.
+ */
+function renderPharmacyClaims(snapshot: ReturnType<typeof gate.snapshot>): void {
+  if (!hosts.claims) return;
+
+  const controls = PHARMACY_CLAIM_IDS.map((claimId) => {
+    const spec = PHARMACY_CLAIMS[claimId];
+    const tool = toolNameFor(claimId);
+    const state = snapshot.capabilities.find((capability) => capability.name === tool);
+    const granted = state?.granted === true;
+
+    const meta = [
+      el('p', { class: 'claim-label', text: spec.label }),
+      el('p', { class: 'claim-discloses', text: spec.discloses }),
+    ];
+    if (granted && state?.expiresAt != null) {
+      meta.push(el('p', { class: 'claim-expiry', text: `permitted, ${secondsUntil(state.expiresAt)}s remaining` }));
+    }
+
+    return el('div', { class: 'claim', data: { granted: String(granted) } }, [
+      el('div', { class: 'claim-meta' }, meta),
+      granted
+        ? button('Withdraw', () => consentActions.revoke(tool), { variant: 'revoke' })
+        : button('Permit', () => consentActions.grant(tool, 'permitted directly from the console'), {
+            variant: 'grant',
+          }),
+    ]);
+  });
+
+  replaceChildren(hosts.claims, ...controls);
 }
 
 function renderShopperEditor(): void {
