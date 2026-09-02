@@ -163,6 +163,7 @@ declare global {
  * ------------------------------------------------------------------ */
 
 async function boot(): Promise<void> {
+  applyUiVariant();
   window.mahaba = { diagnostics };
 
   registerCapabilities({ gate, getProfile });
@@ -213,6 +214,22 @@ async function applyDemoState(): Promise<void> {
   } catch (error) {
     console.error(`demo state "${demo}" could not be applied`, error);
   }
+}
+
+/**
+ * UI framing variant. Editorial is the default (set as data-ui="editorial" on
+ * <html> in the markup). `?ui=classic` opts back into the original instrument
+ * framing. Framing only; the capability console and every tool behaviour are
+ * identical across both.
+ */
+function applyUiVariant(): void {
+  const ui = new URLSearchParams(window.location.search).get('ui');
+  if (ui === 'classic') {
+    document.documentElement.removeAttribute('data-ui');
+  } else if (ui === 'editorial') {
+    document.documentElement.setAttribute('data-ui', 'editorial');
+  }
+  // No param: leave the markup default (editorial) in place.
 }
 
 void boot();

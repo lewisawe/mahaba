@@ -1,0 +1,201 @@
+/**
+ * Editorial framing variant (Scope A).
+ *
+ * Additive layer loaded AFTER styles.css. It restyles only the framing, the
+ * masthead, section headings, rules, and display type, in an editorial /
+ * print-brutalist register. It deliberately does NOT touch the capability
+ * console, claim controls, pending panel, audit log, or the "cannot ask for"
+ * surface: those are the demonstration and stay exactly as they are.
+ *
+ * Identity is kept Mahaba's own: amber-on-near-black, single functional accent.
+ * The borrowed moves are structural (ghost wordmark, giant section numerals,
+ * hard rules, heavier headline), not the palette, so it reads as a sibling of
+ * the base design rather than a clone of another project.
+ *
+ * Opt in with ?ui=editorial (main.ts adds data-ui="editorial" to <html>).
+ */
+
+:root[data-ui="editorial"] {
+  /* A wider measure suits the editorial grid. */
+  --edit-max: 1040px;
+  /* Ghost wordmark + numeral colour: barely-there structural type. */
+  --edit-ghost: rgba(208, 214, 224, 0.045);
+  --edit-rule: var(--line-strong);
+}
+
+/* Wider canvas for the editorial layout. */
+:root[data-ui="editorial"] .masthead,
+:root[data-ui="editorial"] main,
+:root[data-ui="editorial"] .footer {
+  max-width: var(--edit-max);
+}
+
+/* ---------------- Masthead: ghost wordmark + display headline ---------------- */
+
+:root[data-ui="editorial"] .masthead {
+  position: relative;
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-12);
+  border-bottom: 2px solid var(--edit-rule);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Oversized outline wordmark sitting behind the headline. Pointer-inert,
+   hidden from assistive tech, purely atmospheric. */
+:root[data-ui="editorial"] .masthead::before {
+  content: "MAHABA";
+  position: absolute;
+  top: -0.18em;
+  right: -0.04em;
+  z-index: -1;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: clamp(96px, 20vw, 260px);
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--edit-ghost);
+  text-stroke: 1px var(--edit-ghost);
+  pointer-events: none;
+  user-select: none;
+}
+
+:root[data-ui="editorial"] .eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.16em;
+}
+
+:root[data-ui="editorial"] h1 {
+  font-size: clamp(38px, 6.5vw, 74px);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  max-width: 16ch;
+}
+
+:root[data-ui="editorial"] .lede { font-size: 17px; max-width: 60ch; }
+
+/* ---------------- Sections: giant numerals + hard rules ---------------- */
+
+:root[data-ui="editorial"] main {
+  gap: 0;
+  counter-reset: section;
+}
+
+/* Each panel becomes an editorial band: hard top rule, a giant step numeral in
+   the left margin, content to its right. Falls back to stacked on narrow. */
+:root[data-ui="editorial"] main > .panel {
+  counter-increment: section;
+  position: relative;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--edit-rule);
+  border-radius: 0;
+  padding: var(--space-12) 0 var(--space-12) 132px;
+}
+
+/* The numeral. Editorial anchor, decorative, hidden from AT. */
+:root[data-ui="editorial"] main > .panel::before {
+  content: counter(section, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: var(--space-12);
+  width: 104px;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 56px;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(208, 214, 224, 0.14);
+  text-stroke: 1px rgba(208, 214, 224, 0.14);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The hero console band gets the accent numeral, so the eye still lands there
+   first, consistent with the single-flashlight logic. */
+:root[data-ui="editorial"] main > .panel-console::before {
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(232, 185, 35, 0.5);
+  text-stroke: 1px rgba(232, 185, 35, 0.5);
+}
+
+/* Section headings scale up into the editorial register. */
+:root[data-ui="editorial"] .panel h2 {
+  font-family: var(--sans);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--paper);
+}
+
+:root[data-ui="editorial"] .panel-note {
+  font-size: 14px;
+  max-width: 58ch;
+}
+
+/* The console is still the focal panel: keep its inner card treatment so the
+   granted-tool amber wash and rows read exactly as before. We restyle the band
+   around it, not the console itself. Re-draw the console's own surface since we
+   stripped the panel background above. */
+:root[data-ui="editorial"] .panel-console {
+  padding-top: var(--space-12);
+}
+:root[data-ui="editorial"] .panel-console #console,
+:root[data-ui="editorial"] .panel-console .cannot {
+  /* leave inner console styling to styles.css; nothing to override here */
+}
+
+/* Details panels (Your details, Environment) keep the numeral rhythm but read
+   as quieter closing bands. */
+:root[data-ui="editorial"] main > .panel-details {
+  padding-block: var(--space-8);
+}
+:root[data-ui="editorial"] main > .panel-details::before {
+  top: var(--space-8);
+  font-size: 40px;
+}
+
+/* First band shouldn't carry a top rule against the masthead's 2px rule. */
+:root[data-ui="editorial"] main > .panel:first-child {
+  border-top: 0;
+}
+
+/* ---------------- Footer ---------------- */
+
+:root[data-ui="editorial"] .footer {
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 2px solid var(--edit-rule);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+/* ---------------- Responsive: collapse the numeral margin on narrow ---------------- */
+
+@media (max-width: 680px) {
+  :root[data-ui="editorial"] main > .panel {
+    padding-left: 0;
+    padding-block: var(--space-8);
+  }
+  :root[data-ui="editorial"] main > .panel::before {
+    position: static;
+    display: block;
+    width: auto;
+    margin-bottom: var(--space-3);
+    font-size: 34px;
+  }
+  :root[data-ui="editorial"] .masthead::before { font-size: clamp(80px, 26vw, 150px); }
+}
+
+/* Respect reduced motion is inherited; this variant adds no animation. The
+   ghost type also collapses gracefully if text-stroke is unsupported: the fill
+   is transparent, so worst case it is invisible, never a solid block. */
+@supports not ((-webkit-text-stroke: 1px black) or (text-stroke: 1px black)) {
+  :root[data-ui="editorial"] .masthead::before,
+  :root[data-ui="editorial"] main > .panel::before { display: none; }
+}
