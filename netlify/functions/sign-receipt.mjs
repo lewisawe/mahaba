@@ -100,7 +100,7 @@ export default async (request) => {
     return new Response(
       JSON.stringify({
         receipt: {
-          issuer: 'proof-not-profile',
+          issuer: 'mahaba',
           issuedAt,
           entryCount: entries.length,
           entries,

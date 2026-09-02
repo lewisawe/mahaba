@@ -1,5 +1,5 @@
 {
-  "name": "proof-not-profile",
+  "name": "mahaba",
   "version": "0.1.0",
   "description": "A WebMCP eligibility wallet where the agent's tool registry is gated on revocable user consent.",
   "type": "module",

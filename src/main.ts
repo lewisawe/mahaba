@@ -154,7 +154,7 @@ async function diagnostics(): Promise<Diagnostics> {
 
 declare global {
   interface Window {
-    proofNotProfile?: { diagnostics: () => Promise<Diagnostics> };
+    mahaba?: { diagnostics: () => Promise<Diagnostics> };
   }
 }
 
@@ -163,7 +163,7 @@ declare global {
  * ------------------------------------------------------------------ */
 
 async function boot(): Promise<void> {
-  window.proofNotProfile = { diagnostics };
+  window.mahaba = { diagnostics };
 
   registerCapabilities({ gate, getProfile });
 

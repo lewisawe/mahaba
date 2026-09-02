@@ -86,8 +86,8 @@ const PROBE = `
   } catch (e) { ok('request_consent asks without granting', false, e.message); }
 
   // The app's diagnostics hook confirms platform posture from inside the page.
-  const diag = window.proofNotProfile && typeof window.proofNotProfile.diagnostics === 'function'
-    ? await window.proofNotProfile.diagnostics() : null;
+  const diag = window.mahaba && typeof window.mahaba.diagnostics === 'function'
+    ? await window.mahaba.diagnostics() : null;
   out.env.diagnosticsHook = Boolean(diag);
   if (diag) {
     ok('secure context + origin-agent-cluster', diag.isSecureContext && diag.originAgentCluster === true,

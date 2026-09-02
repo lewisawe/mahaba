@@ -1,4 +1,4 @@
-# Proof, Not Profile
+# Mahaba
 
 **A WebMCP wallet where the agent's tool registry is gated on revocable user consent.**
 

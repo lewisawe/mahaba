@@ -30,7 +30,7 @@ export const DEFAULT_SHOPPER: Shopper = {
   hasPrescription: false,
 };
 
-const STORAGE_KEY = 'proof-not-profile:shopper:v1';
+const STORAGE_KEY = 'mahaba:shopper:v1';
 
 export function ageFrom(dateOfBirth: string, now: Date = new Date()): number {
   const dob = new Date(`${dateOfBirth}T00:00:00`);

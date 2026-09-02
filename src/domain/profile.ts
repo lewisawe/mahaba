@@ -31,7 +31,7 @@ export const DEFAULT_PROFILE: Profile = {
   receivingSupport: false,
 };
 
-const STORAGE_KEY = 'proof-not-profile:profile:v1';
+const STORAGE_KEY = 'mahaba:profile:v1';
 
 /** Whole years elapsed, counting only birthdays that have already passed. */
 export function ageFrom(dateOfBirth: string, now: Date = new Date()): number {
